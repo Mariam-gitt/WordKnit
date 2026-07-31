@@ -36,6 +36,45 @@ app.use(async (req, res, next) => {
 
 // Routes
 app.get("/", (req, res) => res.send("Vocabulary App Backend is running 🚀"));
+// Temporary test route: visit this URL directly in a browser to check the HubSpot
+// integration without needing to check server logs. Safe to delete once confirmed working.
+// Note: calls the HubSpot API directly here (rather than reusing syncContactToHubspot),
+// because that function intentionally swallows its own errors so it never breaks real
+// signups — which means it wouldn't show us a failure here either.
+app.get("/api/test-hubspot", async (req, res) => {
+    const axios = require("axios");
+    // Check first whether the token even exists in this environment — this alone tells us
+    // if the Vercel env var actually reached the running app.
+    if (!process.env.HUBSPOT_PRIVATE_APP_TOKEN) {
+        return res.status(500).json({ ok: false, reason: "HUBSPOT_PRIVATE_APP_TOKEN is not set in this environment" });
+    }
+    try {
+        const response = await axios.post(
+            "https://api.hubapi.com/crm/v3/objects/contacts",
+            {
+                properties: {
+                    email: `test-route-${Date.now()}@example.com`,
+                    firstname: "Test",
+                    lastname: "Route"
+                }
+            },
+            {
+                headers: {
+                    "Authorization": `Bearer ${process.env.HUBSPOT_PRIVATE_APP_TOKEN}`,
+                    "Content-Type": "application/json"
+                }
+            }
+        );
+        res.json({ ok: true, hubspotContactId: response.data.id, message: "Success — check your HubSpot Contacts tab" });
+    } catch (err) {
+        res.status(500).json({
+            ok: false,
+            status: err.response?.status,
+            hubspotError: err.response?.data || err.message
+        });
+    }
+});
+
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/words", require("./routes/wordRoutes"));
 app.use("/api/quiz", require("./routes/quizRoutes"));
