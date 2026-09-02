@@ -69,7 +69,11 @@ exports.addWord = async (req, res) => {
 
     } catch (error) {
         console.log("ADD WORD ERROR:", error.response?.data || error.message);
-        res.status(500).json({ message: "Failed to add word" });
+        // res.status(500).json({ message: "Failed to add word" });
+        res.status(500).json({
+    message: "Failed to add word",
+    error: error.response?.data || error.message
+});
     }
 };
 
