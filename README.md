@@ -1,450 +1,217 @@
-# 📚 WordKnit - Vocabulary Learning Platform
 
-A full-stack **MERN application** that transforms how users learn new words through interactive flashcards, AI-powered context generation, and intelligent quizzing. Learn vocabulary faster with multiple learning methods including PDF parsing, image OCR, and contextual meaning generation.
+# 📚 WordKnit
 
-**Live Demo:** [wordKnit](https://my-mern-project-frontend-1.vercel.app/)
+A full-stack vocabulary-learning platform built on **MERN + Python microservices**. You read real PDFs inside the app, WordKnit flags the words that are actually hard *for you*, and turns them into flashcards, AI-explained meanings, and quizzes — instead of a generic word list you have to fill in by hand.
 
----
-
-## ✨ Key Features
-
-- 🎯 **Smart Flashcards** - Review words with spaced repetition tracking
-- 🧠 **Interactive Quizzes** - Multiple-choice quizzes with performance analytics
-- 📄 **PDF Text Extraction** - Upload PDFs to automatically extract and learn words
-- 🖼️ **Image OCR** - Extract text from images using Optical Character Recognition
-- 🤖 **AI-Powered Contexts** - Get intelligent example sentences and contextual meanings via LLM
-- 🔍 **RAG Retrieval** - Retrieval-Augmented Generation for semantically similar contexts
-- 📊 **Progress Tracking** - Monitor learning stats (correct/wrong counts, review dates)
-- 🔐 **Secure Authentication** - JWT-based user authentication with password encryption
-- 🎨 **Responsive Design** - Works seamlessly on desktop and mobile devices
-- 🐳 **Docker Support** - Easy deployment with Docker and Docker Compose
+**Live:** [wordknit](https://my-mern-project-frontend-1.vercel.app/) · Backend: `my-mern-project-backend.vercel.app`
 
 ---
 
-## 🏗️ Architecture Overview
+## ✨ Features
 
-### Tech Stack
+- **PDF reader** — upload and reopen PDFs, with zoom, in-document search, thumbnails, and bookmarks (highlighted text + optional note, tied to a page)
+- **Difficulty analysis** — `scoreDifficulty()` scans an uploaded PDF's text and scores every word on length, academic prefixes/suffixes (`-tion`, `pseudo-`, …), and rarity in that specific document, then filters out words already in your vocab — so it surfaces words that are hard *for you*, not just long words
+- **Word profiles** — combines a free dictionary API, Wikipedia (for academic terms), and Groq (`llama-3.3-70b-versatile`) into one page: definitions, pronunciation, synonym *nuances* (not just a synonym list — when to use each one), a memory hook, and usage examples
+- **Contextual explain** — select a word inside a paragraph you're reading and ask "what does this mean *here*" — Groq answers using the surrounding text, not a generic definition
+- **Document Q&A (RAG)** — ask a question about a document you've uploaded; the RAG-LLM service retrieves the most relevant chunks and Groq answers grounded in them, quoting the source
+- **Flashcards & quizzes** — review words with correct/wrong tracking; quiz distractors are AI-generated plausible-but-wrong meanings (Groq), with a same-vocab fallback if that fails
+- **JWT authentication** — stateless auth, auto-login right after registration, cascading account deletion (wipes words, bookmarks, and documents together)
+- **HubSpot + Resend integration** — new signups fire-and-forget into a HubSpot CRM as contacts and get a welcome email, without ever blocking or breaking registration if either service is down
+- **Wooden-bookshelf library UI** — saved PDFs are displayed as books on a shelf, each given a deterministic color derived from its title
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Frontend** | React 19, React Router v7, Axios | Interactive UI & API communication |
-| **Backend** | Node.js, Express.js | REST API server |
-| **Database** | MongoDB (Cloud) | User data & vocabulary storage |
-| **AI Services** | Python (Flask/FastAPI) | OCR, PDF parsing, RAG embeddings, LLM context |
-| **Deployment** | Docker, Vercel | Containerization & cloud hosting |
-| **Security** | bcryptjs, JWT | Password hashing & token authentication |
+## 🏗️ Tech stack
 
-### Project Structure
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, React Router v7, Axios |
+| Backend | Node.js, Express, MongoDB (Atlas) |
+| AI microservices | Python (PDF extraction, RAG dictionary, RAG+LLM Q&A) |
+| AI model | Groq — `llama-3.3-70b-versatile` / `openai/gpt-oss-120b` |
+| Auth | JWT + bcryptjs |
+| Deployment | Vercel (frontend + backend), Docker (local/self-hosted) |
+
+## 📂 Project structure
 
 ```
 WordKnit/
-├── frontend/                         # React SPA
-│   ├── src/
-│   │   ├── pages/                   # Route pages
-│   │   │   ├── Login.js             # User authentication
-│   │   │   ├── Register.js          # User signup
-│   │   │   ├── Dashboard.js         # Main hub
-│   │   │   ├── Vocabulary.js        # Word management
-│   │   │   ├── Flashcards.js        # Card-based learning
-│   │   │   ├── Quiz.js              # Quiz module
-│   │   │   ├── PDFReader.js         # PDF text extraction
-│   │   │   ├── OCR.js               # Image text extraction
-│   │   │   ├── WordProfile.js       # Word details
-│   │   │   └── ContextualMeaning.js # AI contexts
-│   │   ├── components/              # Reusable React components
-│   │   ├── hooks/                   # Custom React hooks
-│   │   ├── api.js                   # Axios client
-│   │   └── App.js                   # Main router
-│   ├── package.json
-│   └── Dockerfile
+├── frontend/                      # React SPA
+│   └── src/
+│       ├── pages/                 # Login, Register, Dashboard, Vocabulary,
+│       │                          # Flashcards, Quiz, PDFReader, WordProfile,
+│       │                          # ContextualMeaning, DocumentQA
+│       ├── components/            # AppLayout, GazetteShell, WordList, Flashcard,
+│       │                          # VocabTree, AddWord, YarnBallLogo, Navbar
+│       ├── hooks/useTheme.js
+│       └── api.js                 # Axios instance, attaches JWT to every request
 │
-├── backend/                          # Node.js + Express API
-│   ├── config/
-│   │   └── db.js                    # MongoDB connection
-│   ├── models/
-│   │   ├── User.js                  # User schema
-│   │   └── Word.js                  # Word schema
-│   ├── controllers/                 # Business logic
-│   │   ├── authController.js
-│   │   ├── wordController.js
-│   │   ├── quizController.js
-│   │   └── ...
-│   ├── routes/                      # API endpoints
-│   │   ├── authRoutes.js
-│   │   ├── wordRoutes.js
-│   │   ├── quizRoutes.js
-│   │   ├── pdfRoutes.js
-│   │   ├── ocrRoutes.js
-│   │   └── ragRoutes.js
-│   ├── middleware/
-│   │   └── authMiddleware.js        # JWT verification
-│   ├── ocr_service.py               # Python OCR service
-│   ├── pdf_service.py               # Python PDF parser
-│   ├── rag_service.py               # Python RAG embeddings
-│   ├── rag_llm_service.py           # Python LLM context
-│   ├── server.js                    # Express app entry
-│   ├── package.json
-│   ├── requirements.txt
-│   └── Dockerfile
+├── backend/                       # Node + Express API
+│   ├── routes/                    # auth, words, pdf, rag, ragl, contextual,
+│   │                              # documents, bookmarks, wordProfile, (ocr — disabled)
+│   ├── controllers/                # authController, wordController
+│   ├── models/                     # User, Word, Document, Bookmark
+│   ├── middleware/authMiddleware.js
+│   ├── utils/hubspotService.js, aiSentence.js
+│   ├── server.js                   # Express entry point
+│   ├── pdf_service.py              # :5001 — raw PDF text extraction (OCR fallback path)
+│   ├── rag_service.py              # :5002 — pickle-backed TF-IDF dictionary lookup
+│   ├── rag_llm_service.py          # :5004 — document chunking + retrieval for Q&A
+│   └── ocr_service.py              # :5003 — image OCR (route currently disabled)
 │
-├── docker-compose.yml               # Multi-container setup
-├── DOCKER.md                        # Docker guide
-└── project-structure.md             # Detailed architecture
+├── docker-compose.yml
+└── DOCKER.md
 ```
 
----
+## 🔄 How it fits together
 
-## 🔄 How It Works
+```mermaid
+flowchart TB
+    subgraph Client["React SPA (frontend/)"]
+        Reader["PDFReader<br/>zoom · search · bookmarks"]
+        Vocab["Vocabulary / Flashcards / Quiz"]
+        Profile["WordProfile page"]
+        Contextual["ContextualMeaning"]
+        DocQA["DocumentQA"]
+        Api["api.js<br/>(Axios + JWT header)"]
+    end
 
-### 1. User Authentication
-Users register/login with secure JWT token generation. Passwords are hashed using bcryptjs before storage in MongoDB.
+    subgraph Node["Express API (backend/, server.js)"]
+        Auth["/api/auth<br/>register · login · delete"]
+        Words["/api/words<br/>CRUD · quiz"]
+        Docs["/api/documents<br/>/api/bookmarks"]
+        Pdf["/api/pdf<br/>analyze-difficulty"]
+        Rag["/api/rag<br/>ingest · status"]
+        Ragl["/api/ragl<br/>upload · ask"]
+        Ctx["/api/contextual<br/>explain"]
+        WProfile["/api/profile/:word"]
+        Mongo[("MongoDB Atlas<br/>Users · Words · Documents · Bookmarks")]
+    end
 
-```
-Login → Backend validates credentials → JWT token generated → Stored in localStorage
-→ All future requests include token in Authorization header
-```
+    subgraph Py["Python microservices"]
+        PdfSvc["pdf_service.py :5001"]
+        RagSvc["rag_service.py :5002<br/>(TF-IDF + pickle)"]
+        RaglSvc["rag_llm_service.py :5004<br/>(chunk + retrieve)"]
+    end
 
-### 2. Word Management
-Users can manually add words with meanings, examples, and synonyms. All words are tracked with learning status and quiz performance.
+    subgraph External["External services"]
+        Groq[["Groq API<br/>llama-3.3-70b / gpt-oss-120b"]]
+        DictApi["Free Dictionary API"]
+        Wiki["Wikipedia API"]
+        Hub["HubSpot CRM"]
+        Resend["Resend<br/>(welcome email)"]
+    end
 
-**CRUD Operations:**
-- ✅ Create - Add new word via AddWord component
-- ✅ Read - Fetch word list from MongoDB
-- ✅ Update - Edit word details or mark as "learned"
-- ✅ Delete - Remove words from collection
+    Reader --> Api --> Docs & Pdf
+    Vocab --> Api --> Words
+    Profile --> Api --> WProfile
+    Contextual --> Api --> Ctx
+    DocQA --> Api --> Ragl
 
-### 3. Interactive Learning
+    Words --> Mongo
+    Docs --> Mongo
+    Auth --> Mongo
+    Auth -.fire-and-forget.-> Hub
+    Auth -.fire-and-forget.-> Resend
 
-#### 📇 Flashcards
-Review words one by one with front (word) and back (meaning) reveal. Mark as "Learned" or "Need Review" to update status.
-
-#### 🎯 Quizzes
-Backend generates random quiz questions with multiple-choice options. Tracks correct/wrong answers for performance analytics.
-
-#### 📊 Progress Tracking
-Every interaction updates the Word record in MongoDB with:
-- Learning status ("review" / "learned")
-- Correct answer count
-- Wrong answer count
-- Last reviewed date
-
-### 4. Multi-Input Learning Methods
-
-#### 📄 PDF Text Extraction
-1. User uploads PDF via PDFReader page
-2. Backend receives file via multer middleware
-3. Python `pdf_service.py` extracts all text content
-4. Frontend displays extracted text
-5. Users can select and add words to vocabulary
-
-#### 🖼️ Image OCR
-1. User uploads image via OCR page
-2. Backend processes image with Python `ocr_service.py`
-3. Tesseract/Paddle OCR detects text in image
-4. Extracted text displayed for word addition
-
-### 5. AI-Powered Context Generation
-
-#### 🤖 LLM Contextual Meanings
-Calls `rag_llm_service.py` which prompts an LLM (GPT/Claude) to generate:
-- Example sentences using the word
-- Contextual usage patterns
-- Related terminology
-
-#### 🔍 RAG Context Retrieval
-`rag_service.py` converts words to vector embeddings and searches a RAG database to retrieve:
-- Similar word contexts
-- Related examples
-- Semantic associations
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- **Node.js** 18+ 
-- **Python** 3.8+
-- **MongoDB** (Cloud account or local)
-- **Docker** (optional, for containerized setup)
-
-### Installation
-
-#### 1. Clone Repository
-
-```bash
-git clone https://github.com/Mariam-gitt/WordKnit.git
-cd WordKnit
+    Rag --> RagSvc
+    Ragl --> RaglSvc
+    Ctx --> Groq
+    Words -->|"AI quiz distractors"| Groq
+    WProfile --> DictApi & Wiki & Groq
+    RaglSvc --> Groq
 ```
 
-#### 2. Backend Setup
+**Request flow — asking a question about an uploaded document:**
 
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as React (DocumentQA)
+    participant N as Express (/api/ragl/ask)
+    participant P as rag_llm_service.py :5004
+    participant G as Groq API
+
+    U->>F: types a question
+    F->>N: POST /api/ragl/ask { question }
+    N->>P: POST /search?userId=... { query }
+    P-->>N: top matching chunks + scores
+    alt no relevant chunks
+        N-->>F: "couldn't find this in your document"
+    else chunks found
+        N->>G: prompt = chunks + question, ask for JSON
+        G-->>N: { answer, quote, confidence }
+        N-->>F: answer + quoted source chunk
+    end
+    F-->>U: shows answer, grounded in the document
+```
+
+**Difficulty analysis** runs entirely inside the Express process (no Python round-trip): `pdf-parse` extracts text, `scoreDifficulty()` tokenizes and scores every candidate word (length, academic affixes, rarity, consonant clustering), filters out words already in the user's vocab, and returns the top 50 — which the Dashboard offers to add straight into the vocab list.
+
+## 🚀 Getting started
+
+**Backend**
 ```bash
 cd backend
-
-# Install Node dependencies
 npm install
-
-# Install Python dependencies
 pip install -r requirements.txt
 
-# Create .env file
 cat > .env << EOF
-MONGO_URI=mongodb+srv://your_username:your_password@cluster.mongodb.net/wordknit
-JWT_SECRET=your_secret_key_here
-NODE_ENV=development
+MONGO_URI=mongodb+srv://...
+JWT_SECRET=your_secret_key
+GROQ_API_KEY=your_groq_key
+HUBSPOT_PRIVATE_APP_TOKEN=your_hubspot_token   # optional
+RESEND_API_KEY=your_resend_key                 # optional
 PORT=5000
 EOF
 
-# Start backend server
-npm run dev      # With auto-reload (development)
-# OR
-npm start        # Production mode
+npm run dev                    # Express API on :5000
+python rag_service.py          # dictionary RAG service on :5002
+python rag_llm_service.py      # document Q&A service on :5004
+# python pdf_service.py        # :5001, only needed for the OCR path (currently disabled)
 ```
 
-#### 3. Frontend Setup
-
-```bash
-cd ../frontend
-
-# Install React dependencies
-npm install
-
-# Create .env file
-cat > .env << EOF
-REACT_APP_API_URL=http://localhost:5000
-EOF
-
-# Start React development server
-npm start
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Docker Setup (Recommended)
-
-```bash
-# Build and run all services
-docker-compose up --build
-
-# Stop services
-docker-compose down
-```
-
-This will start:
-- MongoDB container
-- Backend server (port 5000)
-- Frontend server (port 3000)
-
----
-
-## 📊 Key API Endpoints
-
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| **POST** | `/api/auth/register` | Create new account |
-| **POST** | `/api/auth/login` | User login |
-| **GET** | `/api/words` | Fetch all user words |
-| **POST** | `/api/words` | Add new word |
-| **PUT** | `/api/words/:id` | Update word details |
-| **DELETE** | `/api/words/:id` | Delete word |
-| **GET** | `/api/quiz` | Get quiz questions |
-| **POST** | `/api/quiz/submit` | Submit quiz answer |
-| **POST** | `/api/pdf/upload` | Upload & extract PDF text |
-| **POST** | `/api/ocr/extract` | Extract text from image |
-| **GET** | `/api/rag/context` | Get RAG-based contexts |
-| **GET** | `/api/ragl/context` | Get LLM-generated contexts |
-
----
-
-## 🗄️ Database Schema
-
-### User Collection
-```javascript
-{
-  _id: ObjectId,
-  name: String,        // User's full name
-  email: String,       // Unique email
-  password: String,    // Hashed with bcryptjs
-  createdAt: Date,
-  updatedAt: Date
-}
-```
-
-### Word Collection
-```javascript
-{
-  _id: ObjectId,
-  userId: ObjectId,              // Reference to User
-  word: String,                  // The vocabulary word
-  meaning: String,               // Definition
-  exampleSentence: String,       // Usage example
-  synonyms: [String],            // Related words
-  status: String,                // "review" or "learned"
-  correctCount: Number,          // Quiz correct answers
-  wrongCount: Number,            // Quiz wrong answers
-  lastReviewed: Date,            // Last flashcard review
-  createdAt: Date,
-  updatedAt: Date
-}
-```
-
----
-
-## 🔐 Security Features
-
-- **Password Hashing** - bcryptjs (12-round salt)
-- **JWT Authentication** - Secure token-based auth
-- **Protected Routes** - `authMiddleware` verifies tokens
-- **Environment Variables** - Sensitive data in `.env`
-- **CORS Configuration** - Controlled cross-origin requests
-
----
-
-## 🧪 Testing
-
-### Run Frontend Tests
+**Frontend**
 ```bash
 cd frontend
-npm test
+npm install
+echo "REACT_APP_API_URL=http://localhost:5000" > .env
+npm start                      # http://localhost:3000
 ```
 
-### Run Backend with Nodemon
+**Docker (all-in-one)**
 ```bash
-cd backend
-npm run dev  # Auto-restarts on file changes
+docker-compose up --build
 ```
 
----
+## 📊 Key API endpoints
 
-## 📈 Project Composition
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | `/api/auth/register` / `/login` | Account creation & login (JWT) |
+| DELETE | `/api/auth/account` | Delete account + cascade all user data |
+| GET/POST | `/api/words` | List / add vocabulary words |
+| GET | `/api/words/quiz` | Quiz questions with AI-generated distractors |
+| POST | `/api/pdf/analyze-difficulty` | Score & return hardest words in an uploaded PDF |
+| POST/GET | `/api/documents` | Upload / list saved PDFs |
+| PATCH | `/api/documents/:id` | Update last-read page |
+| POST/GET | `/api/bookmarks` | Save / list highlighted bookmarks |
+| POST | `/api/contextual/explain` | Explain a word using its surrounding paragraph |
+| POST | `/api/ragl/upload` / `/ask` | Index a document / ask grounded questions about it |
+| GET | `/api/profile/:word` | Full word profile (dictionary + Wikipedia + Groq) |
 
-```
-JavaScript: 73.5% ████████████████████
-CSS:        17.2% ████
-Python:      8.6% ██
-Other:       0.7% 
-```
+## 🔐 Security
 
----
+- Passwords hashed with bcryptjs; JWT-based stateless auth (`authMiddleware` protects all user routes)
+- Third-party integrations (HubSpot, Resend) are fire-and-forget — a slow or failed call never blocks or breaks registration
+- Saved documents are keyed by an unguessable Mongo ObjectId; delete-account cascades across Words, Bookmarks, and Documents in one `Promise.all`
 
-## 🌐 Deployment
+## 🐳 Docker
 
-### Vercel (Frontend Recommended)
-```bash
-# Frontend deployment
-vercel deploy
-```
-
-### Backend Deployment Options
-- **Vercel** - Serverless Node.js
-- **Heroku** - Classic PaaS
-- **AWS** - EC2 or Lambda
-- **DigitalOcean** - VPS
-- **Self-hosted** - Any Node.js server
-
-### Environment Variables to Set
-**Frontend:**
-- `REACT_APP_API_URL` - Backend API URL
-
-**Backend:**
-- `MONGO_URI` - MongoDB connection string
-- `JWT_SECRET` - Secret for token signing
-- `NODE_ENV` - development/production
-- `PORT` - Server port (default 5000)
-
----
-
-## 🐛 Troubleshooting
-
-### Issue: Can't connect to MongoDB
-**Solution:**
-- Verify MongoDB URI in `.env`
-- Check internet connection (for cloud MongoDB)
-- Ensure IP is whitelisted in MongoDB Atlas
-
-### Issue: JWT token errors
-**Solution:**
-- Clear browser localStorage
-- Ensure token is being sent in Authorization header
-- Check JWT_SECRET matches between login & middleware
-
-### Issue: PDF/OCR not working
-**Solution:**
-- Install Python dependencies: `pip install -r requirements.txt`
-- Verify Python version 3.8+
-- Check Tesseract installation for OCR
-
-### Issue: React can't reach backend
-**Solution:**
-- Verify backend server is running (port 5000)
-- Check `REACT_APP_API_URL` in `.env`
-- Ensure CORS is enabled in Express
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Follow these steps:
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes
-4. Commit: `git commit -m 'Add amazing feature'`
-5. Push: `git push origin feature/amazing-feature`
-6. Open a Pull Request
-
----
-
-## 📚 Learning Resources
-
-- **React 19** - [react.dev](https://react.dev)
-- **Express.js** - [expressjs.com](https://expressjs.com)
-- **MongoDB** - [mongodb.com/docs](https://www.mongodb.com/docs)
-- **JWT** - [jwt.io](https://jwt.io)
-- **Docker** - [docker.com/resources](https://www.docker.com/resources)
-
----
-
-## 🎯 Roadmap
-
-Future enhancements:
-
-- [ ] Spaced repetition algorithm for optimal review scheduling
-- [ ] Analytics dashboard for learning progress
-- [ ] Multiplayer quizzes & leaderboards
-- [ ] Mobile app (React Native)
-- [ ] Voice pronunciation & audio recognition
-- [ ] Community word lists & sharing
-- [ ] Email notifications for review reminders
-- [ ] Dark mode theme
-
----
+See `DOCKER.md` for the full container setup — `docker-compose.yml` runs MongoDB, the Express API, and the frontend together.
 
 ## 📄 License
 
-This project is open source and available under the **ISC License**.
-
----
+ISC License — see repository for details.
 
 ## 👤 Author
 
-**Mariam** - [GitHub Profile](https://github.com/Mariam-gitt)
-
----
-
-## 💡 Highlights
- 
-*"WordKnit is a MERN stack vocabulary learning platform that combines traditional learning methods (flashcards, quizzes) with AI-powered features (LLM context generation, RAG embeddings). It supports multiple input methods including PDF parsing and image OCR, with JWT authentication and progress tracking."*
-
-**Key Technical Achievements:**
-✅ Full-stack MERN development  
-✅ Python microservices for AI/ML tasks  
-✅ JWT token-based security  
-✅ MongoDB data modeling & aggregation  
-✅ PDF & image text extraction  
-✅ Docker containerization  
-✅ RESTful API design  
-
----
-
+**Mariam** — [GitHub](https://github.com/Mariam-gitt)
