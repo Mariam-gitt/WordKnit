@@ -433,9 +433,8 @@ This project is open source and available under the **ISC License**.
 
 ---
 
-## 💡 Interview Highlights
-
-**30-Second Pitch:**  
+## 💡 Highlights
+ 
 *"WordKnit is a MERN stack vocabulary learning platform that combines traditional learning methods (flashcards, quizzes) with AI-powered features (LLM context generation, RAG embeddings). It supports multiple input methods including PDF parsing and image OCR, with JWT authentication and progress tracking."*
 
 **Key Technical Achievements:**
@@ -449,4 +448,3 @@ This project is open source and available under the **ISC License**.
 
 ---
 
-**Start learning smarter today! 📖✨**
