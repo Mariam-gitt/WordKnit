@@ -155,7 +155,7 @@ npm install
 pip install -r requirements.txt
 
 cat > .env << EOF
-MONGO_URI=mongodb+srv://...
+MONGO_URI=
 JWT_SECRET=your_secret_key
 GROQ_API_KEY=your_groq_key
 HUBSPOT_PRIVATE_APP_TOKEN=your_hubspot_token   # optional
