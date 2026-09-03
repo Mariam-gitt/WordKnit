@@ -2,7 +2,7 @@
 
 A full-stack **MERN application** that transforms how users learn new words through interactive flashcards, AI-powered context generation, and intelligent quizzing. Learn vocabulary faster with multiple learning methods including PDF parsing, image OCR, and contextual meaning generation.
 
-**Live Demo:** [my-mern-project-backend.vercel.app](https://my-mern-project-backend.vercel.app)
+**Live Demo:** [my-mern-project-backend.vercel.app](https://my-mern-project-frontend-1.vercel.app/)
 
 ---
 
