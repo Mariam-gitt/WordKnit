@@ -119,31 +119,6 @@ flowchart TB
     WProfile --> DictApi & Wiki & Groq
     RaglSvc --> Groq
 ```
-
-**Request flow — asking a question about an uploaded document:**
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant F as React (DocumentQA)
-    participant N as Express (/api/ragl/ask)
-    participant P as rag_llm_service.py :5004
-    participant G as Groq API
-
-    U->>F: types a question
-    F->>N: POST /api/ragl/ask { question }
-    N->>P: POST /search?userId=... { query }
-    P-->>N: top matching chunks + scores
-    alt no relevant chunks
-        N-->>F: "couldn't find this in your document"
-    else chunks found
-        N->>G: prompt = chunks + question, ask for JSON
-        G-->>N: { answer, quote, confidence }
-        N-->>F: answer + quoted source chunk
-    end
-    F-->>U: shows answer, grounded in the document
-```
-
 **Difficulty analysis** runs entirely inside the Express process (no Python round-trip): `pdf-parse` extracts text, `scoreDifficulty()` tokenizes and scores every candidate word (length, academic affixes, rarity, consonant clustering), filters out words already in the user's vocab, and returns the top 50 — which the Dashboard offers to add straight into the vocab list.
 
 ## 🚀 Getting started
