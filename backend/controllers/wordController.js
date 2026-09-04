@@ -27,16 +27,35 @@ const getMeaning = async (word) => {
     }
 
     // ── Fallback: Free Dictionary API ──
-    const response = await axios.get(
-        `https://api.dictionaryapi.dev/api/v2/entries/en/${word}`
-    );
-    const data = response.data?.[0];
-    return {
-        meaning: data?.meanings?.[0]?.definitions?.[0]?.definition || "No meaning found",
-        exampleSentence: data?.meanings?.[0]?.definitions?.[0]?.example || "No example available",
-        synonyms: data?.meanings?.[0]?.definitions?.[0]?.synonyms || [],
-        source: "Free Dictionary API"
-    };
+    // This call was NOT wrapped in try/catch before — dictionaryapi.dev returns
+    // a 404 (which axios treats as a thrown error) for any word it doesn't
+    // recognize, e.g. typos, proper nouns, less common words. On Vercel the RAG
+    // service above is unreachable (it's a separate local Python process), so
+    // EVERY word landed here — meaning any word not in the free dictionary
+    // crashed the whole request with a 500. Wrapping this fixes it: unknown
+    // words now just save with a placeholder meaning instead of failing.
+    try {
+        const response = await axios.get(
+            `https://api.dictionaryapi.dev/api/v2/entries/en/${word}`,
+            { timeout: 5000 }
+        );
+        const data = response.data?.[0];
+        return {
+            meaning: data?.meanings?.[0]?.definitions?.[0]?.definition || "No meaning found",
+            exampleSentence: data?.meanings?.[0]?.definitions?.[0]?.example || "No example available",
+            synonyms: data?.meanings?.[0]?.definitions?.[0]?.synonyms || [],
+            source: "Free Dictionary API"
+        };
+    } catch (err) {
+        // Covers: word not found (404), API down, timeout, rate limit, etc.
+        console.log(`[Dictionary API] Failed for "${word}":`, err.response?.status || err.message);
+        return {
+            meaning: "No meaning found — try checking the spelling or add your own note.",
+            exampleSentence: "No example available",
+            synonyms: [],
+            source: "Not found"
+        };
+    }
 };
 
 
@@ -123,7 +142,9 @@ Respond in this exact JSON format, nothing else:
         const groqRes = await axios.post(
             "https://api.groq.com/openai/v1/chat/completions",
             {
-                model: "llama-3.3-70b-versatile",
+                // llama-3.3-70b-versatile was shut down by Groq on Aug 16 2026 — switched
+                // to its recommended replacement to match the rest of the codebase.
+                model: "openai/gpt-oss-120b",
                 messages: [{ role: "user", content: prompt }],
                 temperature: 0.8,
                 max_tokens: 400
