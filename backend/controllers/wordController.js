@@ -2,7 +2,68 @@ const Word = require("../models/Word");
 const axios = require("axios");
 
 /**
- * Try RAG service first, fallback to free dictionary API
+ * Ask Groq to write a real dictionary-style definition for a word neither
+ * the RAG service nor the free Dictionary API could find. Same JSON-prompt
+ * pattern as generateSimilarDecoys() below. Returns null on any failure so
+ * the caller can fall back to the plain placeholder message.
+ */
+const generateMeaningWithGroq = async (word) => {
+    if (!process.env.GROQ_API_KEY) return null;
+
+    const prompt = `Give a dictionary-style definition for the English word "${word}".
+
+Respond in this exact JSON format, nothing else:
+{
+  "meaning": "a concise one-sentence definition",
+  "exampleSentence": "one natural example sentence using the word",
+  "synonyms": ["synonym1", "synonym2", "synonym3"]
+}
+
+If "${word}" is not a real English word (e.g. a typo or made-up string), respond with:
+{ "meaning": null, "exampleSentence": null, "synonyms": [] }`;
+
+    try {
+        const groqRes = await axios.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            {
+                model: "openai/gpt-oss-120b",
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.3,
+                max_tokens: 300
+            },
+            {
+                headers: {
+                    "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+                    "Content-Type": "application/json"
+                },
+                timeout: 10000
+            }
+        );
+
+        const content = groqRes.data.choices[0].message.content.trim();
+        const cleaned = content.replace(/```json|```/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+
+        if (!parsed.meaning) return null;
+        return {
+            meaning: parsed.meaning,
+            exampleSentence: parsed.exampleSentence || "No example available",
+            synonyms: Array.isArray(parsed.synonyms) ? parsed.synonyms : [],
+            source: "AI Generated"
+        };
+    } catch (err) {
+        console.log(`[Groq meaning] Failed for "${word}":`, err.response?.data || err.message);
+        return null;
+    }
+};
+
+/**
+ * Try RAG service first, then the free dictionary API, then Groq as a last
+ * resort. dictionaryapi.dev is a small donation-funded project that's often
+ * slow, missing common words, or fully down (confirmed: it returned a
+ * Cloudflare 522 outage on 2026-09-04) — so it can't be the only real
+ * source. Groq is already used elsewhere in this app and reliably up, so it
+ * gives a genuine definition instead of the placeholder in most cases.
  */
 const getMeaning = async (word) => {
 
@@ -26,36 +87,43 @@ const getMeaning = async (word) => {
         console.log(`[RAG] Not found or unavailable — falling back to API`);
     }
 
-    // ── Fallback: Free Dictionary API ──
-    // This call was NOT wrapped in try/catch before — dictionaryapi.dev returns
-    // a 404 (which axios treats as a thrown error) for any word it doesn't
-    // recognize, e.g. typos, proper nouns, less common words. On Vercel the RAG
-    // service above is unreachable (it's a separate local Python process), so
-    // EVERY word landed here — meaning any word not in the free dictionary
-    // crashed the whole request with a 500. Wrapping this fixes it: unknown
-    // words now just save with a placeholder meaning instead of failing.
+    // ── Try: Free Dictionary API ──
+    // Wrapped in try/catch — dictionaryapi.dev can throw for a 404 (word not
+    // found), a timeout, or an outright outage (seen: Cloudflare 522). Any of
+    // those used to crash the whole addWord request with an uncaught error;
+    // now they just fall through to the Groq fallback below instead.
     try {
         const response = await axios.get(
             `https://api.dictionaryapi.dev/api/v2/entries/en/${word}`,
             { timeout: 5000 }
         );
         const data = response.data?.[0];
-        return {
-            meaning: data?.meanings?.[0]?.definitions?.[0]?.definition || "No meaning found",
-            exampleSentence: data?.meanings?.[0]?.definitions?.[0]?.example || "No example available",
-            synonyms: data?.meanings?.[0]?.definitions?.[0]?.synonyms || [],
-            source: "Free Dictionary API"
-        };
+        const definition = data?.meanings?.[0]?.definitions?.[0]?.definition;
+        if (definition) {
+            return {
+                meaning: definition,
+                exampleSentence: data?.meanings?.[0]?.definitions?.[0]?.example || "No example available",
+                synonyms: data?.meanings?.[0]?.definitions?.[0]?.synonyms || [],
+                source: "Free Dictionary API"
+            };
+        }
     } catch (err) {
         // Covers: word not found (404), API down, timeout, rate limit, etc.
         console.log(`[Dictionary API] Failed for "${word}":`, err.response?.status || err.message);
-        return {
-            meaning: "No meaning found — try checking the spelling or add your own note.",
-            exampleSentence: "No example available",
-            synonyms: [],
-            source: "Not found"
-        };
     }
+
+    // ── Last resort: ask Groq to write a definition ──
+    const groqMeaning = await generateMeaningWithGroq(word);
+    if (groqMeaning) return groqMeaning;
+
+    // Only reached if RAG, the dictionary API, AND Groq all failed/found nothing —
+    // e.g. GROQ_API_KEY isn't set, or the word genuinely isn't a real word.
+    return {
+        meaning: "No meaning found — try checking the spelling or add your own note.",
+        exampleSentence: "No example available",
+        synonyms: [],
+        source: "Not found"
+    };
 };
 
 
