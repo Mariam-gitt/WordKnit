@@ -1,3 +1,4 @@
+
 const express = require("express");
 const router = express.Router();
 const axios = require("axios");
@@ -165,7 +166,9 @@ Respond ONLY in this exact JSON format:
                 const groqRes = await axios.post(
                     "https://api.groq.com/openai/v1/chat/completions",
                     {
-                        model: "llama-3.3-70b-versatile",
+                        // llama-3.3-70b-versatile was shut down by Groq on Aug 16 2026 — switched
+                        // to its recommended replacement to match the rest of the codebase.
+                        model: "openai/gpt-oss-120b",
                         messages: [{ role: "user", content: prompt }],
                         temperature: 0.5,
                         max_tokens: 900
