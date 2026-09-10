@@ -1,48 +1,16 @@
-// // const mongoose = require("mongoose");
-
-// // const wordSchema = new mongoose.Schema({
-
-// //     userId: {
-// //         type: mongoose.Schema.Types.ObjectId,
-// //         ref: "User"
-// //     },
-
-// //     word: String,
-// //     meaning: String,
-// //     synonyms: [String],
-// //     exampleSentence: String
-
-// // }, { timestamps: true });
-
-// // module.exports = mongoose.model("Word", wordSchema);
-
-// const mongoose = require("mongoose");
-
-// const wordSchema = new mongoose.Schema({
-
-//     userId: {
-//         type: mongoose.Schema.Types.ObjectId,
-//         ref: "User"
-//     },
-
-//     word: String,
-//     meaning: String,
-//     synonyms: [String],
-//     exampleSentence: String
-
-// }, { timestamps: true });
-
-// module.exports = mongoose.model("Word", wordSchema);
-
-const mongoose = require("mongoose");
+const mongoose = require("mongoose"); // library that maps this schema to a MongoDB collection
 
 const wordSchema = new mongoose.Schema({
 
-    // Link word to logged-in user
+    // Which user this saved word belongs to.
+    // index: true speeds up every query that filters by user (getWords, getQuiz) — without
+    // it, MongoDB has to scan the entire Word collection on every request to find one
+    // user's words; with it, that lookup goes straight to the matching documents.
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
-        required: true
+        required: true,
+        index: true
     },
 
     word: {
