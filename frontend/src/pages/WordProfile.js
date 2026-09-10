@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api";
@@ -323,8 +324,7 @@ function WordProfile() {
                                     <div style={{ fontSize: "0.82rem", color: "var(--text-2)", lineHeight: "1.7", padding: "12px 16px", background: "var(--surface)", border: "1px solid var(--border)" }}>
                                         <strong>Step 1 — Free Dictionary API:</strong> First call for phonetics, audio, base definitions, and example sentences.<br/>
                                         <strong>Step 2 — Wikipedia API:</strong> If the word looks academic (long, complex suffix, or field-specific), Wikipedia is queried for a contextual summary.<br/>
-                                        <strong>Step 3 — Groq AI (LLaMA 3.3 70B):</strong> AI generates synonym nuances, a mnemonic memory hook, and richer usage examples in parallel.<br/>
-                                        <strong>RAG fallback:</strong> If a custom dictionary was ingested, it's used via semantic search (embeddings) when the API has no results.
+                                        <strong>Step 3 — Groq AI:</strong> AI generates synonym nuances, a mnemonic memory hook, and richer usage examples in parallel.
                                     </div>
                                 </div>
 
