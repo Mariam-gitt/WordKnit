@@ -1,40 +1,19 @@
-// const mongoose = require("mongoose");
+const mongoose = require("mongoose"); // library that manages the connection + models for MongoDB
 
-// // Function to connect database
-// const connectDB = async () => {
-
-//     try {
-//         await mongoose.connect(process.env.MONGO_URI);
-
-//         console.log("MongoDB Connected Successfully 💾");
-
-//     } catch (error) {
-//         console.log("MongoDB Connection Failed ❌", error);
-
-//         process.exit(1); 
-//         // stop server if DB fails
-//     }
-// };
-
-// module.exports = connectDB;
-
-
-const mongoose = require("mongoose");
-
+// Opens a connection to MongoDB, reusing an existing one when possible.
 const connectDB = async () => {
-  // ✅ If already connected, reuse the existing connection
+  // readyState of 1 means "already connected" — on Vercel, many requests share the same
+  // warm serverless instance, so this check saves us from reconnecting on every request.
   if (mongoose.connections[0].readyState) {
-    console.log("MongoDB Already Connected 💾");
     return;
   }
 
-  try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log("MongoDB Connected Successfully 💾");
-  } catch (error) {
-    console.log("MongoDB Connection Failed ❌", error);
-    process.exit(1);
-  }
+  // No try/catch here on purpose: if the connection fails, we let the error bubble up to
+  // server.js, which already wraps this call in its own try/catch and returns a proper
+  // 503 response. (This used to call process.exit(1) on failure — fine for a traditional
+  // always-running server, but on Vercel that kills the whole serverless function instance
+  // instead of just failing the one request, which is far more disruptive.)
+  await mongoose.connect(process.env.MONGO_URI);
 };
 
 module.exports = connectDB;
