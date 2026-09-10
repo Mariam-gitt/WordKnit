@@ -4,6 +4,7 @@ const multer = require("multer");
 const axios = require("axios");
 const protect = require("../middleware/authMiddleware");
 const Word = require("../models/Word");
+const { getMeaning } = require("../controllers/wordController"); // reuse the same cache → dictionary API → Groq chain used by "add word", instead of duplicating it here
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -11,14 +12,22 @@ const upload = multer({ storage: multer.memoryStorage() });
  * POST /api/ocr/extract
  * Send image → OCR detects highlighted/underlined words
  * → fetch meanings → save to vocab
+ *
+ * OCR_SERVICE_URL must be set to wherever the OCR model is actually running
+ * (e.g. your Hugging Face Space URL) — this route is not mounted in server.js
+ * yet, since the OCR model itself isn't reliable enough yet. Once it is,
+ * set OCR_SERVICE_URL and uncomment the app.use("/api/ocr", ...) line there.
  */
 router.post("/extract", protect, upload.single("image"), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ message: "No image uploaded" });
+        if (!process.env.OCR_SERVICE_URL) {
+            return res.status(503).json({ message: "OCR service isn't configured yet (OCR_SERVICE_URL is not set)" });
+        }
 
         // Step 1 — Send image to OCR service
         const ocrRes = await axios.post(
-            "http://localhost:5003/extract",
+            `${process.env.OCR_SERVICE_URL}/extract`,
             req.file.buffer,
             {
                 headers: {
@@ -53,36 +62,10 @@ router.post("/extract", protect, upload.single("image"), async (req, res) => {
                     continue;
                 }
 
-                // Try RAG first, then dictionary API
-                let meaning = "No meaning found";
-                let exampleSentence = "No example available";
-                let synonyms = [];
-
-                try {
-                    const ragRes = await axios.post(
-                        "http://localhost:5002/lookup",
-                        { word },
-                        { timeout: 2000 }
-                    );
-                    if (ragRes.data?.meaning) {
-                        meaning = ragRes.data.meaning;
-                        exampleSentence = ragRes.data.exampleSentence || "No example available";
-                    }
-                } catch {
-                    // RAG not available, try dictionary API
-                    try {
-                        const dictRes = await axios.get(
-                            `https://api.dictionaryapi.dev/api/v2/entries/en/${word}`,
-                            { timeout: 5000 }
-                        );
-                        const data = dictRes.data?.[0];
-                        meaning = data?.meanings?.[0]?.definitions?.[0]?.definition || "No meaning found";
-                        exampleSentence = data?.meanings?.[0]?.definitions?.[0]?.example || "No example available";
-                        synonyms = data?.meanings?.[0]?.definitions?.[0]?.synonyms || [];
-                    } catch {
-                        // Word not in dictionary — still save it
-                    }
-                }
+                // Same lookup chain "add word" uses: shared cache → dictionary API → Groq.
+                // getMeaning() never throws — it falls back to a placeholder meaning on
+                // total failure — so no try/catch is needed around this call.
+                const { meaning, exampleSentence, synonyms } = await getMeaning(word);
 
                 const newWord = await Word.create({
                     userId: req.user,
@@ -114,7 +97,7 @@ router.post("/extract", protect, upload.single("image"), async (req, res) => {
         console.log("OCR ROUTE ERROR:", err.message);
         if (err.code === "ECONNREFUSED") {
             return res.status(500).json({
-                message: "OCR service not running. Start with: python ocr_service.py"
+                message: "Couldn't reach the OCR service — check that OCR_SERVICE_URL is correct and the service is running"
             });
         }
         res.status(500).json({ message: "Failed to process image" });
