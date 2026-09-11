@@ -1,3 +1,4 @@
+
 // useState: React's way of storing values that, when changed, make the component re-render
 // useRef: stores a value that PERSISTS across re-renders but does NOT trigger a re-render when changed —
 //         we use this for the SpeechRecognition object itself, since recreating it every render would break it
@@ -11,10 +12,11 @@ import AppLayout from "../components/AppLayout"; // shared page frame (sidebar, 
 // this (instead of a jumble of separate true/false flags) makes it much easier to reason
 // about "what should the mic be doing right now?" at any given moment.
 const STATE = {
-    IDLE: "idle",                     // nothing happening, waiting for the user to press Start
-    LISTENING_WORD: "listening_word", // mic is on, waiting for the user to say a word
-    LOOKING_UP: "looking_up",         // word captured, waiting on the backend for its meaning
-    SPEAKING: "speaking",             // the browser is reading the meaning out loud
+    IDLE: "idle",                       // nothing happening, waiting for the user to press Start
+    LISTENING_WORD: "listening_word",   // mic is on, waiting for the user to say a word
+    CONFIRMING_WORD: "confirming_word", // mic is on again, waiting for "yes"/"no" about the word it thinks it heard
+    LOOKING_UP: "looking_up",           // word confirmed, waiting on the backend for its meaning
+    SPEAKING: "speaking",               // the browser is reading the meaning out loud
     LISTENING_COMMAND: "listening_command" // mic is on again, waiting for "add it" / "skip" / "stop"
 };
 
@@ -43,6 +45,11 @@ function VoiceAssistant() {
     useEffect(() => {
         currentWordRef.current = currentWord;
     }, [currentWord]);
+
+    // Holds the word we THINK we heard, while we're waiting for the user to confirm it's
+    // actually right — separate from currentWordRef, which only holds a word AFTER it's
+    // been confirmed and looked up. Same "avoid a stale closure" reasoning as above.
+    const candidateWordRef = useRef(null);
 
     // Adds one line to the on-screen transcript log (newest on top). Kept as its own small
     // helper since several places below need to log something.
@@ -128,6 +135,26 @@ function VoiceAssistant() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [addCurrentWord, lookupWord, speak]);
 
+    // ── Handle the yes/no reply after we ask "Did you say X?" ──
+    // This is the actual fix for mis-heard words: instead of immediately looking up
+    // whatever the recognizer's first guess was, we say it back and wait for confirmation
+    // BEFORE committing to a lookup — so a mis-hear just triggers "say the word again"
+    // rather than silently defining the wrong word.
+    const handleConfirmation = useCallback((transcript) => {
+        const said = transcript.toLowerCase();
+        const candidate = candidateWordRef.current;
+
+        if (said.includes("no") || said.includes("wrong") || said.includes("not")) {
+            speak("Okay, say the word again.", () => startListening(STATE.LISTENING_WORD));
+        } else {
+            // Anything that isn't a clear "no" (e.g. "yes", "yeah", "correct", "right") is
+            // treated as confirmation — this is a deliberate simplification: it means an
+            // unclear reply defaults to proceeding rather than getting stuck in a loop.
+            lookupWord(candidate);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [lookupWord, speak]);
+
     // ── Starts the mic listening for ONE utterance, then routes the result based on `forState` ──
     // forState tells us WHY we're listening right now: capturing a fresh word, or waiting for
     // a yes/no/add command — the result is handled differently depending on which one it is.
@@ -170,20 +197,39 @@ function VoiceAssistant() {
         recognition.continuous = false;    // stop automatically after ONE spoken phrase, rather than staying open indefinitely
         recognition.interimResults = false; // only give us the FINAL transcript, not a live-updating guess while still speaking
         recognition.lang = "en-US";         // the language we're listening for
+        recognition.maxAlternatives = 3;    // ask for up to 3 guesses, not just one — logged below so mis-hears are easier to spot
 
         // Fires when a transcript is ready (the user finished speaking a phrase).
         recognition.onresult = (event) => {
-            // event.results is an array-like object; [0][0] is the top guess for the first phrase heard
+            // event.results[0] holds up to `maxAlternatives` guesses for this one phrase,
+            // best guess first. [0][0] is that best guess — the one we actually act on.
             const transcript = event.results[0][0].transcript.trim();
-            logLine(`🎤 You: "${transcript}"`);
+
+            // Log every alternative the recognizer considered, not just the one we're using —
+            // when it mis-hears a word, seeing "decoy" was ALSO a candidate (even if ranked
+            // second) is useful, and it costs nothing extra to show.
+            const alternatives = [];
+            for (let i = 0; i < event.results[0].length; i++) {
+                alternatives.push(event.results[0][i].transcript);
+            }
+            logLine(`🎤 Heard: ${alternatives.join(" / ")}`);
 
             if (recognition.forState === STATE.LISTENING_COMMAND) {
                 handleCommand(transcript);
+            } else if (recognition.forState === STATE.CONFIRMING_WORD) {
+                handleConfirmation(transcript);
             } else {
                 // Recognition sometimes appends punctuation ("scare.") — strip anything that
                 // isn't a letter, and just take the first word in case multiple were caught.
                 const word = transcript.toLowerCase().replace(/[^a-z\s]/g, "").trim().split(/\s+/)[0];
-                if (word) lookupWord(word);
+                if (word) {
+                    // Don't look it up yet — say it back and get a "yes" first, so a
+                    // mis-heard word (e.g. "decoy" heard as "define") doesn't silently
+                    // get defined and added under the wrong spelling.
+                    candidateWordRef.current = word;
+                    setSessionState(STATE.SPEAKING);
+                    speak(`Did you say ${word}?`, () => startListening(STATE.CONFIRMING_WORD));
+                }
             }
         };
 
@@ -226,6 +272,7 @@ function VoiceAssistant() {
     const statusText = {
         [STATE.IDLE]: "Tap Start, then say a word",
         [STATE.LISTENING_WORD]: "Listening for a word…",
+        [STATE.CONFIRMING_WORD]: "Did I hear that right? Say yes, or say it again",
         [STATE.LOOKING_UP]: "Looking that up…",
         [STATE.SPEAKING]: "Speaking…",
         [STATE.LISTENING_COMMAND]: "Say \"add it\", a new word, or \"stop\""
