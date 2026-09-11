@@ -67,7 +67,13 @@ function VoiceAssistant() {
         utterance.rate = 0.95;  // slightly slower than default (1.0) — easier to follow for a definition
         utterance.pitch = 1;    // normal pitch, no change
         utterance.onend = () => {
-            if (onDone) onDone(); // runs after the browser has finished reading the text aloud
+            // A short pause here matters: the moment `onend` fires, some browsers (notably
+            // Chrome on Windows) haven't fully released the microphone/audio device back from
+            // the speaker yet. Calling recognition.start() immediately can silently fail with
+            // an "already started" / device-busy error — which is exactly what was causing
+            // "when I say yes or no, nothing happens": the mic was never actually listening.
+            // 300ms is enough of a gap for the handoff to finish cleanly.
+            if (onDone) setTimeout(onDone, 300);
         };
         window.speechSynthesis.cancel(); // stop anything mid-sentence before starting a new utterance, so overlapping speech never happens
         window.speechSynthesis.speak(utterance); // hands the utterance to the browser's speech engine — this is what actually produces sound
@@ -162,12 +168,25 @@ function VoiceAssistant() {
         if (!recognitionRef.current) return; // safety check in case the browser doesn't support this at all
         setSessionState(forState);
         setErrorMsg("");
+        const rec = recognitionRef.current;
+        rec.forState = forState; // stash this on the object so the onresult handler (defined once, below) knows what mode we're in
         try {
-            recognitionRef.current.forState = forState; // stash this on the object so the onresult handler (defined once, below) knows what mode we're in
-            recognitionRef.current.start(); // this is what actually turns the microphone on and begins listening
+            rec.start(); // this is what actually turns the microphone on and begins listening
         } catch (err) {
-            // .start() throws if recognition is already running — safe to ignore, it just means
-            // a previous session is still winding down.
+            // .start() throws "already started" if the previous session hasn't fully wound
+            // down yet — this used to be silently swallowed here, which is exactly what made
+            // "say yes/no" appear to do nothing (the mic never actually turned back on).
+            // Force-stop the stale session and retry shortly after, instead of giving up.
+            logLine(`⚠️ Mic was still busy, retrying…`);
+            try { rec.stop(); } catch (stopErr) { /* already stopped, nothing to do */ }
+            setTimeout(() => {
+                try {
+                    rec.forState = forState;
+                    rec.start();
+                } catch (retryErr) {
+                    logLine(`⚠️ Couldn't restart the mic: ${retryErr.message}`);
+                }
+            }, 300);
         }
     };
 
