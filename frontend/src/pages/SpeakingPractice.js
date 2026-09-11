@@ -170,6 +170,13 @@ function SpeakingPractice() {
                     </button>
                 )}
 
+                {/* Rendered regardless of hasStarted, so a failed startConversation call
+                    (which never flips hasStarted to true) is actually visible instead of
+                    silently reverting the button back to "Start Conversation". */}
+                {micSupported && errorMsg && !hasStarted && (
+                    <p style={{ color: "var(--accent)" }}>{errorMsg}</p>
+                )}
+
                 {micSupported && hasStarted && (
                     <>
                         {vocabWords.length > 0 && (
