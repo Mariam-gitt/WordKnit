@@ -1,3 +1,4 @@
+
 // axios: makes the outgoing HTTP requests to Groq's three separate endpoints
 const axios = require("axios");
 // form-data: builds a real multipart/form-data request body — the format file uploads
@@ -11,6 +12,15 @@ const Word = require("../models/Word");
 // change (unlikely, but possible) only needs editing in one place.
 const GROQ_BASE = "https://api.groq.com/openai/v1";
 
+// Groq's Orpheus TTS models have a HARD limit of 200 characters per request — anything
+// longer is rejected outright with a 400 error (see their docs: "The input text length
+// is limited to 200 characters"). This is the ROOT CAUSE of "the coach never starts":
+// the LLM was being asked for "1 to 3 sentences", which very often comes out well over
+// 200 characters, so synthesizeSpeech() below kept failing on almost every single reply.
+// Defined once here so both the prompt instruction and the code-level safety net (in
+// truncateForSpeech, further down) always agree on the exact same number.
+const ORPHEUS_MAX_CHARS = 200;
+
 /**
  * Builds the "personality" instructions sent to the LLM before every reply.
  * This is what turns a generic chat model into a specific character (a patient
@@ -18,11 +28,17 @@ const GROQ_BASE = "https://api.groq.com/openai/v1";
  */
 const buildSystemPrompt = (vocabWords) => {
     let prompt = "You are Knit, a friendly, patient English-speaking practice partner "
-        + "inside a vocabulary learning app. Keep every reply SHORT — 1 to 3 sentences, "
-        + "like a real spoken conversation, never a lecture. If the user's last message "
-        + "had a grammar mistake, don't call it out directly or say \"you made a mistake\" — "
-        + "just naturally reply using the correct phrasing yourself, the way a friend "
-        + "would model it without embarrassing them. Always end your reply with a short "
+        + "inside a vocabulary learning app. Keep every reply VERY SHORT — a single short "
+        // This sentence is the actual bug fix: the model was previously allowed up to 3
+        // sentences, which reliably produced replies longer than Orpheus's 200-character
+        // limit. Telling it the EXACT character budget (rather than a vague "be short")
+        // makes the model far more likely to actually stay under it on its own.
+        + `sentence, no more than about ${ORPHEUS_MAX_CHARS - 20} characters — this is a hard `
+        + "technical limit, not just a style preference, so treat it as a strict rule. "
+        + "Sound like a real spoken conversation, never a lecture. If the user's last "
+        + "message had a grammar mistake, don't call it out directly or say \"you made a "
+        + "mistake\" — just naturally reply using the correct phrasing yourself, the way a "
+        + "friend would model it without embarrassing them. End your reply with a short "
         + "follow-up question, so the conversation keeps going.";
 
     // Only mention vocab words if the user actually has some saved — an empty list would
@@ -33,6 +49,38 @@ const buildSystemPrompt = (vocabWords) => {
             + `Don't force one into every single message — only when it actually fits.`;
     }
     return prompt;
+};
+
+/**
+ * SAFETY NET for the 200-character Orpheus limit explained above. Even with the prompt
+ * instruction above, LLMs don't always obey character-count instructions precisely — so
+ * this function is the thing that GUARANTEES synthesizeSpeech() never receives text that's
+ * too long, no matter what the model actually returns. Without this, a single unusually
+ * long reply would still crash that turn of the conversation the exact same way.
+ *
+ * Cuts the text down to fit, trying to end on a clean sentence or word boundary rather
+ * than slicing a word in half — much more natural to listen to if a trim is ever needed.
+ */
+const truncateForSpeech = (text, maxChars = ORPHEUS_MAX_CHARS) => {
+    if (text.length <= maxChars) return text; // the common case — nothing to do
+
+    // Look for the LAST sentence-ending punctuation (. ! or ?) that still fits within the
+    // limit, so a trim (if one is needed at all) lands on a natural pause rather than
+    // mid-sentence. slice(0, maxChars) first shrinks our search window to just the part
+    // that's actually allowed through.
+    const window = text.slice(0, maxChars);
+    const lastSentenceEnd = Math.max(window.lastIndexOf(". "), window.lastIndexOf("! "), window.lastIndexOf("? "));
+
+    if (lastSentenceEnd > 40) {
+        // Found a decent sentence boundary well into the text (not right at the start) —
+        // cut there, keeping the punctuation itself (+1) but not the trailing space.
+        return window.slice(0, lastSentenceEnd + 1);
+    }
+
+    // No good sentence boundary found (e.g. it's all one long sentence) — fall back to
+    // cutting at the last whole WORD instead of slicing a word in half mid-letter.
+    const lastSpace = window.lastIndexOf(" ");
+    return lastSpace > 40 ? window.slice(0, lastSpace) : window; // last-resort: just hard-cut if even this fails
 };
 
 /**
@@ -136,7 +184,13 @@ exports.startConversation = async (req, res) => {
         // A fake "opening move" so the LLM has something to respond to — this never gets
         // shown to the user, it just kicks the conversation into motion.
         const openingHistory = [{ role: "user", content: "Let's start a conversation to practice my English." }];
-        const replyText = await getCoachReply(openingHistory, vocabWords);
+        // Truncate BEFORE doing anything else with it, so the text shown on screen, the
+        // text spoken aloud, and the text saved into history are always exactly the same
+        // string — otherwise you could end up reading one sentence while hearing a
+        // different (cut-off) one. See truncateForSpeech above for why this exists at all:
+        // it's the fix for Orpheus's hard 200-character-per-request limit.
+        const rawReplyText = await getCoachReply(openingHistory, vocabWords);
+        const replyText = truncateForSpeech(rawReplyText);
         const audioBuffer = await synthesizeSpeech(replyText);
 
         // The full history INCLUDING this opening exchange gets sent back — the frontend
@@ -212,7 +266,11 @@ exports.handleTurn = async (req, res) => {
         const recentHistory = history.slice(-20);
 
         const vocabWords = await pickVocabWords(req.user);
-        const replyText = await getCoachReply(recentHistory, vocabWords);
+        // Same reasoning as in startConversation above: truncate FIRST, then use that one
+        // truncated string for the on-screen text, the spoken audio, and the saved history —
+        // never speak a different (shorter) version of what's displayed.
+        const rawReplyText = await getCoachReply(recentHistory, vocabWords);
+        const replyText = truncateForSpeech(rawReplyText);
         const audioBuffer = await synthesizeSpeech(replyText);
 
         history.push({ role: "assistant", content: replyText });
