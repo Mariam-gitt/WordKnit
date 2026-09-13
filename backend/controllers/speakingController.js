@@ -1,4 +1,3 @@
-
 // axios: makes the outgoing HTTP requests to Groq's three separate endpoints
 const axios = require("axios");
 // form-data: builds a real multipart/form-data request body — the format file uploads
@@ -121,7 +120,18 @@ const getCoachReply = async (history, vocabWords) => {
         model: "openai/gpt-oss-120b",
         messages,
         temperature: 0.7, // a bit of natural variety in phrasing, without going off-topic
-        max_tokens: 200   // keeps replies short on purpose — a rambling wall of text is hard to listen to
+        // "openai/gpt-oss-120b" is a REASONING model — before writing its actual visible
+        // reply, it first spends some of its token budget on internal chain-of-thought
+        // ("thinking") that never gets shown to the user. That invisible thinking counts
+        // against max_tokens just like the real reply does. THIS WAS THE BUG: with
+        // max_tokens: 200 and no reasoning_effort set, a more complex exchange (like
+        // discussing a word's meaning and building a sentence with it) could burn the
+        // ENTIRE 200-token budget on thinking alone, leaving literally nothing left to
+        // write the actual reply — Groq returns content: "" in that case (not an error),
+        // and that empty string is what later crashed the text-to-speech step with
+        // "input is required".
+        reasoning_effort: "low", // asks the model to think LESS before answering — plenty for a short, casual conversational reply, and leaves far more of the token budget free for the actual visible content
+        max_tokens: 400          // raised from 200 — extra headroom so even "low" reasoning plus a full reply comfortably fits without running out mid-thought
     }, {
         headers: {
             Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
@@ -133,27 +143,57 @@ const getCoachReply = async (history, vocabWords) => {
     return response.data.choices[0].message.content.trim();
 };
 
+// One last line of defense, used just below wherever we're about to hand text to
+// synthesizeSpeech(). Even with reasoning_effort tuned down and more max_tokens headroom
+// above, an LLM call can still — rarely — come back with nothing usable (a moderation
+// block, a network hiccup mid-stream, or some future edge case we haven't hit yet). Rather
+// than let that empty string reach Orpheus and fail the whole turn again with "input is
+// required", we swap in this friendly fallback line so the conversation can always continue.
+const FALLBACK_COACH_REPLY = "Sorry, could you say that again?";
+
 /**
  * STEP 3 of the pipeline: turns the coach's reply text into spoken audio.
  * Returns raw WAV bytes as a Buffer — NOT a URL — since we're not storing these
  * clips anywhere; they get sent straight back to the browser and then discarded.
  */
 const synthesizeSpeech = async (text) => {
-    const response = await axios.post(`${GROQ_BASE}/audio/speech`, {
-        model: "canopylabs/orpheus-v1-english",
-        voice: "hannah", // one of Orpheus's built-in English voices — easy to swap for a different one later
-        input: text,
-        response_format: "wav"
-    }, {
-        headers: {
-            Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-            "Content-Type": "application/json"
-        },
-        responseType: "arraybuffer", // tells axios "this response is binary audio, not JSON" — otherwise it'd try (and fail) to parse the WAV bytes as text
-        timeout: 30000
-    });
+    try {
+        const response = await axios.post(`${GROQ_BASE}/audio/speech`, {
+            model: "canopylabs/orpheus-v1-english",
+            voice: "hannah", // one of Orpheus's built-in English voices — easy to swap for a different one later
+            input: text,
+            response_format: "wav"
+        }, {
+            headers: {
+                Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+                "Content-Type": "application/json"
+            },
+            responseType: "arraybuffer", // tells axios "this response is binary audio, not JSON" — otherwise it'd try (and fail) to parse the WAV bytes as text
+            timeout: 30000
+        });
 
-    return Buffer.from(response.data); // raw WAV audio bytes
+        return Buffer.from(response.data); // raw WAV audio bytes
+    } catch (error) {
+        // WHY THIS CATCH EXISTS: because we told axios above that a SUCCESSFUL response is
+        // raw binary (responseType: "arraybuffer"), axios applies that same setting to an
+        // ERROR response too — so when Groq sends back a normal JSON error message like
+        // {"error":{"message":"..."}}, it arrives here as raw bytes instead of readable
+        // text. Left alone, console.log(error) would print an unreadable dump like
+        // "<Buffer 7b 22 65 72 72 6f 72 22 3a ...>" — which is exactly what happened
+        // before this fix, and had to be decoded by hand to find the real problem.
+        // Here, we catch that raw-bytes error, turn it back into a normal readable
+        // string (and parse it as JSON if it is one), and THEN re-throw — so whichever
+        // function called us, and its own console.log(), sees a normal readable message.
+        if (Buffer.isBuffer(error.response?.data)) {
+            const decodedText = error.response.data.toString("utf-8"); // bytes → readable string
+            try {
+                error.response.data = JSON.parse(decodedText); // usually Groq's errors ARE valid JSON — parse it back into a normal object
+            } catch {
+                error.response.data = decodedText; // wasn't JSON after all — a plain readable string is still a huge improvement over a Buffer dump
+            }
+        }
+        throw error; // re-throw so startConversation/handleTurn's existing try/catch still handles it exactly as before — we only fixed what it LOOKS like in the logs
+    }
 };
 
 /**
@@ -190,7 +230,10 @@ exports.startConversation = async (req, res) => {
         // different (cut-off) one. See truncateForSpeech above for why this exists at all:
         // it's the fix for Orpheus's hard 200-character-per-request limit.
         const rawReplyText = await getCoachReply(openingHistory, vocabWords);
-        const replyText = truncateForSpeech(rawReplyText);
+        // Use the fallback line if the model somehow came back with nothing usable (see
+        // FALLBACK_COACH_REPLY above for why this check exists at all) — guarantees
+        // synthesizeSpeech() is NEVER called with an empty string.
+        const replyText = truncateForSpeech(rawReplyText || FALLBACK_COACH_REPLY);
         const audioBuffer = await synthesizeSpeech(replyText);
 
         // The full history INCLUDING this opening exchange gets sent back — the frontend
@@ -270,7 +313,9 @@ exports.handleTurn = async (req, res) => {
         // truncated string for the on-screen text, the spoken audio, and the saved history —
         // never speak a different (shorter) version of what's displayed.
         const rawReplyText = await getCoachReply(recentHistory, vocabWords);
-        const replyText = truncateForSpeech(rawReplyText);
+        // Same fallback as in startConversation above — never let an empty LLM reply
+        // reach synthesizeSpeech() and fail the whole turn with "input is required".
+        const replyText = truncateForSpeech(rawReplyText || FALLBACK_COACH_REPLY);
         const audioBuffer = await synthesizeSpeech(replyText);
 
         history.push({ role: "assistant", content: replyText });
