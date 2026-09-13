@@ -51,6 +51,22 @@ function VoiceAssistant() {
     // been confirmed and looked up. Same "avoid a stale closure" reasoning as above.
     const candidateWordRef = useRef(null);
 
+    // ── NEW REFS — these three exist purely to fix the "not always listening" bug ──
+    // Keeps a live reference to the CURRENT SpeechSynthesisUtterance object. Some browsers
+    // (Chrome especially) will silently garbage-collect an utterance mid-speech if nothing
+    // is holding onto it — and when that happens, the utterance's "onend" event never
+    // fires, which used to mean the mic never turned back on. Storing it here in a ref
+    // keeps it alive for as long as this component is mounted.
+    const utteranceRef = useRef(null);
+    // Holds the ID of our "safety net" timer (explained inside speak() below), so we can
+    // cancel it early if the real onend event DOES fire in time, or if the user hits Stop.
+    const fallbackTimerRef = useRef(null);
+    // Tracks whether a voice session is CURRENTLY meant to be running. We check this before
+    // ever restarting the mic from an async callback (like the safety-net timer), so that
+    // if the user has already pressed Stop, a late-firing callback can't un-stop things by
+    // accidentally turning the mic back on behind their back.
+    const sessionActiveRef = useRef(false);
+
     // Adds one line to the on-screen transcript log (newest on top). Kept as its own small
     // helper since several places below need to log something.
     const logLine = (text) => {
@@ -66,8 +82,19 @@ function VoiceAssistant() {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.rate = 0.95;  // slightly slower than default (1.0) — easier to follow for a definition
         utterance.pitch = 1;    // normal pitch, no change
-        utterance.onend = () => {
-            // A short pause here matters: the moment `onend` fires, some browsers (notably
+
+        // `alreadyFinished` guards against running the "I'm done talking" logic TWICE for
+        // the same utterance. Below, there are now two different paths that can trigger it
+        // (the real onend event, and our fallback safety timer) — without this flag, if
+        // onend fires just slightly late (right after the fallback already ran), we'd call
+        // startListening() twice in a row, which would mean two mic sessions racing each
+        // other. This flag makes sure only the FIRST of the two ever actually does anything.
+        let alreadyFinished = false;
+        const finishSpeaking = () => {
+            if (alreadyFinished) return;   // second call (whichever path it came from) is ignored
+            alreadyFinished = true;
+            clearTimeout(fallbackTimerRef.current); // the other path didn't need to fire — cancel it
+            // A short pause here matters: the moment speech actually ends, some browsers (notably
             // Chrome on Windows) haven't fully released the microphone/audio device back from
             // the speaker yet. Calling recognition.start() immediately can silently fail with
             // an "already started" / device-busy error — which is exactly what was causing
@@ -75,6 +102,42 @@ function VoiceAssistant() {
             // 300ms is enough of a gap for the handoff to finish cleanly.
             if (onDone) setTimeout(onDone, 300);
         };
+
+        utterance.onend = finishSpeaking; // the NORMAL path: browser tells us it finished speaking
+        // onerror can fire INSTEAD of onend if speech gets interrupted or cancelled partway —
+        // treating it the same as "finished" means we never get stuck waiting for an onend
+        // that was never going to come because something already went wrong.
+        utterance.onerror = finishSpeaking;
+
+        // ── THE ACTUAL BUG FIX: a "safety net" timer ──
+        // This is what was causing "not always listening". Chrome (and some other browsers)
+        // have a long-standing bug where the speechSynthesis "onend" event sometimes just
+        // never fires at all — no error, no warning, it simply never comes. When that
+        // happened here, nothing ever called `onDone`, so `startListening()` was never
+        // called again, and the mic stayed off until you manually hit Stop then Start.
+        // That exactly matches your transcript: "Did you say flabbergasted?" spoken, then
+        // total silence until you pressed the button twice.
+        //
+        // We can't fix Chrome's bug directly, so instead: estimate roughly how long this
+        // sentence SHOULD take to finish speaking (based on word count and speaking rate),
+        // add a generous cushion, and if the real onend/onerror still haven't fired by
+        // then, call finishSpeaking() ourselves anyway. Worst case, we start listening a
+        // touch later than ideal. Best case, we automatically recover from a hang that
+        // previously required you to manually restart the whole session.
+        const wordCount = text.split(/\s+/).filter(Boolean).length; // rough word count of the sentence being spoken
+        const averageWordsPerMinuteAtRate1 = 150; // a commonly-cited average spoken-English rate
+        const estimatedSpeakingMs = (wordCount / averageWordsPerMinuteAtRate1) * 60 * 1000 / utterance.rate; // scale for our 0.95 rate
+        const cushionMs = 2000; // extra buffer so we don't fire the safety net while onend is just about to arrive normally
+        const safetyDelayMs = Math.max(estimatedSpeakingMs + cushionMs, 3000); // never less than 3s, even for very short phrases like "Okay, skipping."
+        fallbackTimerRef.current = setTimeout(() => {
+            // Only recover automatically if a session is still supposed to be running —
+            // if the user already pressed Stop, do nothing (see sessionActiveRef above).
+            if (!sessionActiveRef.current) return;
+            logLine("⚠️ Speech engine went silent (a known browser bug) — recovering automatically");
+            finishSpeaking();
+        }, safetyDelayMs);
+
+        utteranceRef.current = utterance; // keep this utterance alive for the browser's whole speech engine — prevents the garbage-collection issue mentioned above
         window.speechSynthesis.cancel(); // stop anything mid-sentence before starting a new utterance, so overlapping speech never happens
         window.speechSynthesis.speak(utterance); // hands the utterance to the browser's speech engine — this is what actually produces sound
         logLine(`🔊 WordKnit: "${text}"`);
@@ -166,6 +229,11 @@ function VoiceAssistant() {
     // a yes/no/add command — the result is handled differently depending on which one it is.
     const startListening = (forState) => {
         if (!recognitionRef.current) return; // safety check in case the browser doesn't support this at all
+        // Extra guard for the new safety-net timer: if the user already pressed Stop
+        // between when a speak() call started and when its fallback timer fired, don't
+        // let this late callback secretly turn the mic back on. Without this check, a
+        // slow-to-fire safety timer could "resurrect" a session the user deliberately ended.
+        if (!sessionActiveRef.current) return;
         setSessionState(forState);
         setErrorMsg("");
         const rec = recognitionRef.current;
@@ -191,6 +259,8 @@ function VoiceAssistant() {
     };
 
     const stopSession = () => {
+        sessionActiveRef.current = false; // mark the session over FIRST, so any in-flight fallback timer knows not to restart listening
+        clearTimeout(fallbackTimerRef.current); // no need for the safety net to fire — we're stopping on purpose
         window.speechSynthesis.cancel(); // stop any speech in progress immediately
         if (recognitionRef.current) recognitionRef.current.stop(); // turns the mic off
         setSessionState(STATE.IDLE);
@@ -273,6 +343,7 @@ function VoiceAssistant() {
         return () => {
             recognition.stop();
             window.speechSynthesis.cancel();
+            clearTimeout(fallbackTimerRef.current); // don't let a pending safety-net timer fire after the page itself has been left
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // empty array = run once on mount only
@@ -280,6 +351,7 @@ function VoiceAssistant() {
     // ── What the "Start"/"Stop" button does, depending on current state ──
     const handleMainButton = () => {
         if (sessionState === STATE.IDLE) {
+            sessionActiveRef.current = true; // mark a session as active BEFORE starting, so the mic-start below is allowed to proceed
             logLine("— session started —");
             startListening(STATE.LISTENING_WORD); // begin by listening for the first word
         } else {
