@@ -33,7 +33,20 @@ export default defineConfig({
             name: "load-js-files-as-jsx",
             async transform(code, id) {
                 if (!id.match(/\/src\/.*\.js$/)) return null; // only touch our own .js source files, not library code in node_modules
-                return transformWithEsbuild(code, id, { loader: "jsx" });
+                // jsx: "automatic" is the fix for a real bug this project hit: without it,
+                // esbuild defaults to the OLDER "classic" JSX transform, which compiles
+                // `<Login />` into `React.createElement(...)` calls and requires every
+                // single file to explicitly `import React from "react"` at the top. This
+                // codebase (correctly, under modern conventions) mostly doesn't do that —
+                // e.g. a file might only `import { useState } from "react"` — which is
+                // perfectly fine under the "automatic" runtime (the modern default since
+                // React 17, and what @vitejs/plugin-react's own transform already uses for
+                // .jsx files), but caused "Uncaught ReferenceError: React is not defined"
+                // in the browser under the classic runtime. This one option keeps this
+                // custom .js-handling plugin consistent with how @vitejs/plugin-react
+                // already treats .jsx files, instead of silently using an older, stricter
+                // convention just for this one code path.
+                return transformWithEsbuild(code, id, { loader: "jsx", jsx: "automatic" });
             }
         },
         react()
