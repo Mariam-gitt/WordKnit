@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!-- Under CRA these paths used "%PUBLIC_URL%/favicon.ico" — a placeholder CRA's build
+         step replaced with the right URL. Vite doesn't use that syntax: it automatically
+         serves everything inside the public/ folder from the site's root path, so a plain
+         "/favicon.ico" already points to the exact same file, with no templating needed. -->
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="WordKnit — a MERN vocabulary learning app" />
+    <link rel="apple-touch-icon" href="/logo192.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>WordKnit</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <!-- This is the biggest structural difference from CRA: under CRA, index.html was a
+         plain template with no script tag at all — the build tool injected the bundled
+         JS automatically, invisibly. Vite works the other way around: index.html is itself
+         the entry point, and YOU point it at your real entry file directly, as an ES module
+         (type="module") — Vite's dev server and production build both start from this exact
+         line rather than needing separate injected boilerplate. -->
+    <script type="module" src="/src/index.js"></script>
+  </body>
+</html>
