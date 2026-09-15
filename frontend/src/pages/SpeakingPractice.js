@@ -109,13 +109,11 @@ function SpeakingPractice() {
     const voicesRef = useRef([]); // mirror of availableVoices, for the same reason as above
     const wakeRecognitionRef = useRef(null);
 
-    const playAudio = (base64Audio) => {
-        // audio/mpeg is the correct MIME type for MP3 (the backend now asks Orpheus for
-        // "mp3" instead of "wav" — see speakingController.js's synthesizeSpeech for why).
-        // The <audio> element/Audio object plays this exactly the same way either format —
-        // this MIME type is just how the browser knows how to correctly DECODE the bytes
-        // it's about to receive, so it has to match whatever format the backend actually sent.
-        const audio = new Audio(`data:audio/mpeg;base64,${base64Audio}`);
+    const playAudio = (base64Wav) => {
+        // audio/wav — reverted back from mp3 (see synthesizeSpeech in speakingController.js:
+        // Orpheus only actually accepts "wav" as a response_format, despite mp3/flac/ogg
+        // appearing as options in some generic Groq TTS wrapper docs).
+        const audio = new Audio(`data:audio/wav;base64,${base64Wav}`);
         audio.play().catch(() => {});
     };
 
