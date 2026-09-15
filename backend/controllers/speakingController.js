@@ -227,7 +227,14 @@ const synthesizeSpeech = async (text) => {
             model: "canopylabs/orpheus-v1-english",
             voice: "hannah", // one of Orpheus's built-in English voices — easy to swap for a different one later
             input: text,
-            response_format: "wav"
+            // response_format: "mp3" instead of "wav" — WAV is essentially uncompressed
+            // audio, and on top of that this whole response travels as base64 text inside
+            // a JSON payload (base64 itself adds ~33% size over raw bytes). MP3 is a real
+            // compressed format, so switching this one setting meaningfully shrinks every
+            // single reply: faster for Groq to send, faster for the browser to download,
+            // faster for the user to actually hear the coach start speaking. Browsers play
+            // MP3 natively — no extra conversion step needed on either end.
+            response_format: "mp3"
         }, {
             headers: {
                 Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
