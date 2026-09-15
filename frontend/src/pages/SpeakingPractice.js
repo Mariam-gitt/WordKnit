@@ -109,8 +109,13 @@ function SpeakingPractice() {
     const voicesRef = useRef([]); // mirror of availableVoices, for the same reason as above
     const wakeRecognitionRef = useRef(null);
 
-    const playAudio = (base64Wav) => {
-        const audio = new Audio(`data:audio/wav;base64,${base64Wav}`);
+    const playAudio = (base64Audio) => {
+        // audio/mpeg is the correct MIME type for MP3 (the backend now asks Orpheus for
+        // "mp3" instead of "wav" — see speakingController.js's synthesizeSpeech for why).
+        // The <audio> element/Audio object plays this exactly the same way either format —
+        // this MIME type is just how the browser knows how to correctly DECODE the bytes
+        // it's about to receive, so it has to match whatever format the backend actually sent.
+        const audio = new Audio(`data:audio/mpeg;base64,${base64Audio}`);
         audio.play().catch(() => {});
     };
 
