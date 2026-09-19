@@ -1,192 +1,237 @@
+# WordKnit
 
-# 📚 WordKnit
+WordKnit is a full-stack vocabulary learning platform designed to help you learn real words from the material you read. Upload a PDF, read it in-app, identify difficult words, save vocabulary, review with flashcards and quizzes, and ask AI-powered questions about your documents.
 
-A full-stack vocabulary-learning platform built on **MERN + Python microservices**. You read real PDFs inside the app, WordKnit flags the words that are actually hard *for you*, and turns them into flashcards, AI-explained meanings, and quizzes — instead of a generic word list you have to fill in by hand.
+It blends a React frontend, a Node.js/Express API, MongoDB storage, and Python-based AI services to turn reading into a personalized language-learning workflow.
 
-**Live:** [wordknit](https://my-mern-project-frontend-1.vercel.app/) · Backend: `my-mern-project-backend.vercel.app`
+## Features
 
----
+- PDF reading and analysis for difficult vocabulary
+- In-document reading experience with bookmarks and saved highlights
+- Vocabulary tracking with word meaning, usage context, and review status
+- Flashcards and quiz-based revision
+- Word profile pages with dictionary-style information and contextual explanations
+- AI-powered contextual interpretation of words within a passage
+- Document Q&A using retrieval + LLM workflows
+- JWT-based authentication and user account management
+- MongoDB-backed persistence for users, words, documents, and bookmarks
+- Docker-based local setup for full-stack development
 
-## ✨ Features
+## Tech Stack
 
-- **PDF reader** — upload and reopen PDFs, with zoom, in-document search, thumbnails, and bookmarks (highlighted text + optional note, tied to a page)
-- **Difficulty analysis** — `scoreDifficulty()` scans an uploaded PDF's text and scores every word on length, academic prefixes/suffixes (`-tion`, `pseudo-`, …), and rarity in that specific document, then filters out words already in your vocab — so it surfaces words that are hard *for you*, not just long words
-- **Word profiles** — combines a free dictionary API, Wikipedia (for academic terms), and Groq (`llama-3.3-70b-versatile`) into one page: definitions, pronunciation, synonym *nuances* (not just a synonym list — when to use each one), a memory hook, and usage examples
-- **Contextual explain** — select a word inside a paragraph you're reading and ask "what does this mean *here*" — Groq answers using the surrounding text, not a generic definition
-- **Document Q&A (RAG)** — ask a question about a document you've uploaded; the RAG-LLM service retrieves the most relevant chunks and Groq answers grounded in them, quoting the source
-- **Flashcards & quizzes** — review words with correct/wrong tracking; quiz distractors are AI-generated plausible-but-wrong meanings (Groq), with a same-vocab fallback if that fails
-- **JWT authentication** — stateless auth, auto-login right after registration, cascading account deletion (wipes words, bookmarks, and documents together)
-- **HubSpot + Resend integration** — new signups fire-and-forget into a HubSpot CRM as contacts and get a welcome email, without ever blocking or breaking registration if either service is down
-- **Wooden-bookshelf library UI** — saved PDFs are displayed as books on a shelf, each given a deterministic color derived from its title
+- Frontend: React 19, Vite, React Router
+- Backend: Node.js, Express.js, MongoDB
+- AI/ML: Python microservices, Groq API, retrieval-based document Q&A
+- Auth: JWT + bcryptjs
+- Deployment: Vercel + Docker
 
-## 🏗️ Tech stack
+## Project Structure
 
-| Layer | Technology |
-|---|---|
-| Frontend | React 19, React Router v7, Axios |
-| Backend | Node.js, Express, MongoDB (Atlas) |
-| AI microservices | Python (PDF extraction, RAG dictionary, RAG+LLM Q&A) |
-| AI model | Groq — `llama-3.3-70b-versatile` / `openai/gpt-oss-120b` |
-| Auth | JWT + bcryptjs |
-| Deployment | Vercel (frontend + backend), Docker (local/self-hosted) |
-
-## 📂 Project structure
-
-```
+```text
 WordKnit/
-├── frontend/                      # React SPA
-│   └── src/
-│       ├── pages/                 # Login, Register, Dashboard, Vocabulary,
-│       │                          # Flashcards, Quiz, PDFReader, WordProfile,
-│       │                          # ContextualMeaning, DocumentQA
-│       ├── components/            # AppLayout, GazetteShell, WordList, Flashcard,
-│       │                          # VocabTree, AddWord, YarnBallLogo, Navbar
-│       ├── hooks/useTheme.js
-│       └── api.js                 # Axios instance, attaches JWT to every request
-│
-├── backend/                       # Node + Express API
-│   ├── routes/                    # auth, words, pdf, rag, ragl, contextual,
-│   │                              # documents, bookmarks, wordProfile, (ocr — disabled)
-│   ├── controllers/                # authController, wordController
-│   ├── models/                     # User, Word, Document, Bookmark
-│   ├── middleware/authMiddleware.js
-│   ├── utils/hubspotService.js, aiSentence.js
-│   ├── server.js                   # Express entry point
-│   ├── pdf_service.py              # :5001 — raw PDF text extraction (OCR fallback path)
-│   ├── rag_service.py              # :5002 — pickle-backed TF-IDF dictionary lookup
-│   ├── rag_llm_service.py          # :5004 — document chunking + retrieval for Q&A
-│   └── ocr_service.py              # :5003 — image OCR (route currently disabled)
-│
+├── backend/
+│   ├── config/
+│   ├── controllers/
+│   ├── middleware/
+│   ├── models/
+│   ├── routes/
+│   ├── utils/
+│   ├── server.js
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── requirements.txt
+│   ├── pdf_service.py
+│   ├── rag_service.py
+│   ├── rag_llm_service.py
+│   ├── ocr_service.py
+│   ├── Dockerfile
+│   └── vercel.json
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── vite.config.js
+│   ├── index.html
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   └── README.md
 ├── docker-compose.yml
-└── DOCKER.md
+├── DOCKER.md
+├── README.md
+├── project-structure.md
+└── .gitignore
 ```
 
-## 🔄 How it fits together
+## How It Works
 
-```mermaid
-flowchart TB
-    subgraph Client["React SPA (frontend/)"]
-        Reader["PDFReader<br/>zoom · search · bookmarks"]
-        Vocab["Vocabulary / Flashcards / Quiz"]
-        Profile["WordProfile page"]
-        Contextual["ContextualMeaning"]
-        DocQA["DocumentQA"]
-        Api["api.js<br/>(Axios + JWT header)"]
-    end
+### 1. Read and analyze a document
+Users upload PDFs and open them inside the app. The backend extracts text, scores vocabulary difficulty, and identifies words that are likely challenging based on context and word characteristics.
 
-    subgraph Node["Express API (backend/, server.js)"]
-        Auth["/api/auth<br/>register · login · delete"]
-        Words["/api/words<br/>CRUD · quiz"]
-        Docs["/api/documents<br/>/api/bookmarks"]
-        Pdf["/api/pdf<br/>analyze-difficulty"]
-        Rag["/api/rag<br/>ingest · status"]
-        Ragl["/api/ragl<br/>upload · ask"]
-        Ctx["/api/contextual<br/>explain"]
-        WProfile["/api/profile/:word"]
-        Mongo[("MongoDB Atlas<br/>Users · Words · Documents · Bookmarks")]
-    end
+### 2. Save and review vocabulary
+Words can be added to the learner's personal vocabulary list. The app tracks meanings, examples, statuses, and review history.
 
-    subgraph Py["Python microservices"]
-        PdfSvc["pdf_service.py :5001"]
-        RagSvc["rag_service.py :5002<br/>(TF-IDF + pickle)"]
-        RaglSvc["rag_llm_service.py :5004<br/>(chunk + retrieve)"]
-    end
+### 3. Learn with interactive tools
+The app supports flashcards, quizzes, and word profiles to reinforce understanding and retention.
 
-    subgraph External["External services"]
-        Groq[["Groq API<br/>llama-3.3-70b / gpt-oss-120b"]]
-        DictApi["Free Dictionary API"]
-        Wiki["Wikipedia API"]
-        Hub["HubSpot CRM"]
-        Resend["Resend<br/>(welcome email)"]
-    end
+### 4. Ask questions about what you read
+WordKnit can explain a word in context, along with document-level Q&A powered by retrieval and LLM services.
 
-    Reader --> Api --> Docs & Pdf
-    Vocab --> Api --> Words
-    Profile --> Api --> WProfile
-    Contextual --> Api --> Ctx
-    DocQA --> Api --> Ragl
+### 5. Keep user context secure
+Authentication is handled with JWTs, and user data is kept separate by account.
 
-    Words --> Mongo
-    Docs --> Mongo
-    Auth --> Mongo
-    Auth -.fire-and-forget.-> Hub
-    Auth -.fire-and-forget.-> Resend
+## Getting Started
 
-    Rag --> RagSvc
-    Ragl --> RaglSvc
-    Ctx --> Groq
-    Words -->|"AI quiz distractors"| Groq
-    WProfile --> DictApi & Wiki & Groq
-    RaglSvc --> Groq
+### Prerequisites
+
+- Node.js 18+
+- Python 3.10+
+- MongoDB Atlas or a local MongoDB instance
+- Groq API key (for AI features)
+
+### 1) Clone the repository
+
+```bash
+git clone https://github.com/Mariam-gitt/WordKnit.git
+cd WordKnit
 ```
-**Difficulty analysis** runs entirely inside the Express process (no Python round-trip): `pdf-parse` extracts text, `scoreDifficulty()` tokenizes and scores every candidate word (length, academic affixes, rarity, consonant clustering), filters out words already in the user's vocab, and returns the top 50 — which the Dashboard offers to add straight into the vocab list.
 
-## 🚀 Getting started
+### 2) Backend setup
 
-**Backend**
 ```bash
 cd backend
 npm install
 pip install -r requirements.txt
-
-cat > .env << EOF
-MONGO_URI=
-JWT_SECRET=your_secret_key
-GROQ_API_KEY=your_groq_key
-HUBSPOT_PRIVATE_APP_TOKEN=your_hubspot_token   # optional
-RESEND_API_KEY=your_resend_key                 # optional
-PORT=5000
-EOF
-
-npm run dev                    # Express API on :5000
-python rag_service.py          # dictionary RAG service on :5002
-python rag_llm_service.py      # document Q&A service on :5004
-# python pdf_service.py        # :5001, only needed for the OCR path (currently disabled)
 ```
 
-**Frontend**
+Create a `.env` file:
+
+```env
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=your_secret_key
+GROQ_API_KEY=your_groq_api_key
+PORT=5000
+
+# optional integrations
+HUBSPOT_PRIVATE_APP_TOKEN=your_hubspot_token
+RESEND_API_KEY=your_resend_key
+```
+
+Run the backend:
+
+```bash
+npm run dev
+```
+
+Optional Python services:
+
+```bash
+python rag_service.py
+python rag_llm_service.py
+```
+
+### 3) Frontend setup
+
 ```bash
 cd frontend
 npm install
-echo "REACT_APP_API_URL=http://localhost:5000" > .env
-npm start                      # http://localhost:3000
 ```
 
-**Docker (all-in-one)**
+Create a `.env` file:
+
+```env
+REACT_APP_API_URL=http://localhost:5000
+```
+
+Start the frontend:
+
+```bash
+npm run dev
+```
+
+The app will run in development mode, usually at:
+
+- Frontend: http://localhost:5173
+- Backend: http://localhost:5000
+
+### 4) Docker setup
+
+From the project root:
+
 ```bash
 docker-compose up --build
 ```
 
-## 📊 Key API endpoints
+This starts the main services together for a local all-in-one setup.
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/api/auth/register` / `/login` | Account creation & login (JWT) |
-| DELETE | `/api/auth/account` | Delete account + cascade all user data |
-| GET/POST | `/api/words` | List / add vocabulary words |
-| GET | `/api/words/quiz` | Quiz questions with AI-generated distractors |
-| POST | `/api/pdf/analyze-difficulty` | Score & return hardest words in an uploaded PDF |
-| POST/GET | `/api/documents` | Upload / list saved PDFs |
-| PATCH | `/api/documents/:id` | Update last-read page |
-| POST/GET | `/api/bookmarks` | Save / list highlighted bookmarks |
-| POST | `/api/contextual/explain` | Explain a word using its surrounding paragraph |
-| POST | `/api/ragl/upload` / `/ask` | Index a document / ask grounded questions about it |
-| GET | `/api/profile/:word` | Full word profile (dictionary + Wikipedia + Groq) |
+## Main API Endpoints
 
-## 🔐 Security
+The backend exposes endpoints for authentication, documents, vocabulary, quizzes, and AI-assisted learning.
 
-- Passwords hashed with bcryptjs; JWT-based stateless auth (`authMiddleware` protects all user routes)
-- Third-party integrations (HubSpot, Resend) are fire-and-forget — a slow or failed call never blocks or breaks registration
-- Saved documents are keyed by an unguessable Mongo ObjectId; delete-account cascades across Words, Bookmarks, and Documents in one `Promise.all`
+### Authentication
 
-## 🐳 Docker
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `DELETE /api/auth/account`
 
-See `DOCKER.md` for the full container setup — `docker-compose.yml` runs MongoDB, the Express API, and the frontend together.
+### Vocabulary and learning
 
-## 📄 License
+- `GET /api/words`
+- `POST /api/words`
+- `PUT /api/words/:id`
+- `DELETE /api/words/:id`
+- `GET /api/quiz`
+- `POST /api/quiz/submit`
 
-ISC License — see repository for details.
+### Documents and reading
 
-## 👤 Author
+- `POST /api/documents`
+- `GET /api/documents`
+- `PATCH /api/documents/:id`
+- `POST /api/bookmarks`
+- `GET /api/bookmarks`
+- `POST /api/pdf/analyze-difficulty`
 
-**Mariam** — [GitHub](https://github.com/Mariam-gitt)
+### AI-assisted features
+
+- `POST /api/contextual/explain`
+- `POST /api/ragl/upload`
+- `POST /api/ragl/ask`
+- `GET /api/profile/:word`
+- `POST /api/speaking/...` (speech-based learning workflow)
+
+## Database Model
+
+WordKnit stores core data in MongoDB, including:
+
+- Users
+- Words
+- Documents
+- Bookmarks
+
+This allows each user to maintain a personal vocabulary library tied to their reading and learning activity.
+
+## Security
+
+- Passwords are hashed before storage
+- JWT tokens are used for authentication
+- Protected routes are checked through middleware
+- External integrations are designed to fail gracefully without breaking core account flows
+
+## Docker
+
+See `DOCKER.md` for the full container setup and troubleshooting steps. The project includes Docker configuration for local containerized development.
+
+## Notes
+
+This project has evolved beyond a simple dictionary app into a more complete reading-and-learning workflow. It is built around the idea that vocabulary retention improves when words are encountered in context, reviewed repeatedly, and connected to authentic reading material.
+
+## License
+
+This project is distributed under the ISC license as defined in the package metadata.
+
+## Author
+
+Mariam
+
+GitHub: https://github.com/Mariam-gitt
