@@ -1,9 +1,11 @@
 import { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api";
 import AppLayout from "../components/AppLayout";
 import AddWord from "../components/AddWord";
 
 function Dashboard() {
+    const navigate = useNavigate();
     const [words, setWords]                   = useState([]);
     const [newWordProfile, setNewWordProfile] = useState(null);
     const [loadingProfile, setLoadingProfile] = useState(false);
@@ -239,7 +241,7 @@ function Dashboard() {
                                         <div className="word-card-top">
                                             <h3
                                                 className="word-card-word-link"
-                                                onClick={() => window.location.href = `/profile/${w.word}`}
+                                                onClick={() => navigate(`/profile/${encodeURIComponent(w.word)}`)}
                                             >
                                                 {w.word} →
                                             </h3>
@@ -254,7 +256,7 @@ function Dashboard() {
                             {words.length > 5 && (
                                 <button
                                     className="btn btn-ghost"
-                                    onClick={() => window.location.href = "/vocabulary"}
+                                    onClick={() => navigate("/vocabulary")}
                                     style={{ width: "100%", marginTop: "0", borderTop: "none" }}
                                 >
                                     View all {words.length} words →
