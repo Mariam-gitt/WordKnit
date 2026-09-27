@@ -2402,6 +2402,63 @@ input:focus {
   overflow: hidden;
 }
 
+/* Same flat-card softening extended to every other page in the app — the
+   word profile page (profile-hero, profile-tabs, nuance/memory cards),
+   Flashcards, Quiz, the PDF-context/OCR views, and the search/filter bars —
+   so the whole app shares one consistent "clean" look, not just the
+   dashboard. All of these previously had the same hard 2px solid black
+   border used throughout the old newspaper-styled theme. */
+[data-theme="gazette"] .profile-hero,
+[data-theme="gazette"] .profile-tabs,
+[data-theme="gazette"] .context-card,
+[data-theme="gazette"] .context-result,
+[data-theme="gazette"] .flashcard-front,
+[data-theme="gazette"] .flashcard-back,
+[data-theme="gazette"] .flashcard-controls,
+[data-theme="gazette"] .quiz-card,
+[data-theme="gazette"] .ocr-preview-img,
+[data-theme="gazette"] .filter-tabs,
+[data-theme="gazette"] .search-input {
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 14px;
+}
+
+/* The "highlight" nuance card and the memory-hook card are intentional
+   inverted accents (solid dark background, white text) — kept as-is, just
+   rounded and given a soft shadow instead of a hard black outline. */
+[data-theme="gazette"] .nuance-card.highlight-card,
+[data-theme="gazette"] .memory-card {
+  border: none;
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+}
+
+/* Chips/badges used on the word-profile and PDF-source views — square tags
+   in the old theme, rounded pills now, matching .difficult-word-chip. */
+[data-theme="gazette"] .related-chip,
+[data-theme="gazette"] .profile-pos-badge,
+[data-theme="gazette"] .source-type-badge,
+[data-theme="gazette"] .source-badge {
+  border-radius: 999px;
+}
+
+/* These already had lighter (1-1.5px) borders rather than the hard 2px black
+   ones above — just rounding their corners is enough to match the new
+   flat-card look everywhere else. */
+[data-theme="gazette"] .danger-zone,
+[data-theme="gazette"] .empty-state,
+[data-theme="gazette"] .context-error {
+  border-radius: 12px;
+}
+[data-theme="gazette"] .source-card {
+  border-radius: 0; /* these stack directly on top of each other (shared edges) — kept square on purpose */
+}
+[data-theme="gazette"] .source-card:first-child { border-top-left-radius: 12px; border-top-right-radius: 12px; }
+[data-theme="gazette"] .source-card:last-child { border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
+[data-theme="gazette"] .sources-info-box {
+  border-radius: 12px;
+}
+
 [data-theme="gazette"] .page-header {
   /* A faint hairline instead of a bold 2px rule under every page title —
      quieter, closer to how Slack/Instagram separate a header from content. */
@@ -2423,20 +2480,68 @@ input:focus {
   color: var(--accent);
 }
 
+/* Quick-actions row on the Dashboard: "Upload PDF" + "Speaking Coach" as a
+   pair of compact pill buttons sitting right under the Add box, instead of
+   one big full-width button on its own line. */
+.dashboard-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0 20px;
+}
+
+.pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border: 1px solid rgba(0,0,0,0.10);
+  border-radius: 999px; /* fully rounded pill shape */
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.pill-btn:hover:not(:disabled) {
+  background: var(--accent-bg);
+  border-color: rgba(0,0,0,0.18);
+}
+.pill-btn:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
 /* ══════════════════════════════════
-   APP SHELL — persistent sidebar + main content
-   Structure: <div class="app-shell"> contains the mobile-only topbar, the
-   sidebar (always visible on desktop; a slide-in drawer on mobile), and the
-   ".app-body" column holding the actual page plus the optional right aside.
+   APP SHELL — thin yellow frame + white panel + sidebar
+   Structure:
+     .app-frame  → the yellow strip visible on all four edges of the window
+       .app-shell → a plain white, rounded panel holding everything else
+         .app-topbar (mobile only), .app-sidebar, .app-body (page + aside)
 ══════════════════════════════════ */
+
+/* The yellow "frame": a small, even amount of the brand color showing on
+   every side of the window — deliberately thin, not the old big margin. */
+.app-frame {
+  background: var(--mustard);
+  padding: 14px;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
 .app-shell {
   display: flex;
-  min-height: 100vh;
-  background: var(--paper); /* clean white/cream content area, edge to edge */
+  min-height: calc(100vh - 28px); /* 100vh minus the frame's top+bottom padding */
+  background: var(--paper); /* clean white/cream content area */
+  border-radius: 18px;
+  overflow: hidden; /* keeps the sidebar/topbar's square corners clipped to this rounded edge */
 }
 
 .app-shell--reader {
-  height: 100vh; /* the PDF reader page manages its own internal scrolling */
+  height: calc(100vh - 28px); /* the PDF reader page manages its own internal scrolling */
 }
 
 /* Hidden by default — only shown on narrow screens via the media query below. */
@@ -2448,21 +2553,28 @@ input:focus {
 .app-sidebar {
   width: 252px;
   flex-shrink: 0; /* never lets the main content squeeze the sidebar narrower */
-  background: var(--mustard); /* the app's yellow brand color now lives here */
+  background: var(--mustard); /* the app's yellow brand color also lives here */
   display: flex;
   flex-direction: column;
   padding: 22px 14px;
-  position: sticky;
-  top: 0;
-  height: 100vh;
   box-sizing: border-box;
+  height: calc(100vh - 28px); /* matches .app-shell's height so it never overflows the rounded panel */
+  overflow: hidden;
+}
+
+/* Collapsed = fully hidden on desktop (not shrunk to icons) — the little
+   ".app-sidebar-reopen" tab below is what brings it back. Scoped to desktop
+   only; the mobile media query further down restores normal drawer behavior
+   regardless of this class. */
+.app-sidebar.collapsed {
+  display: none;
 }
 
 .app-sidebar-brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 10px 26px;
+  padding: 6px 4px 26px 10px;
 }
 
 .app-sidebar-brand-text {
@@ -2471,7 +2583,47 @@ input:focus {
   font-size: 1.12rem;
   letter-spacing: 0.01em;
   color: var(--ink);
+  flex: 1; /* pushes the collapse button to the far right of the brand row */
 }
+
+/* The small "‹" button inside the sidebar header that hides it completely. */
+.app-sidebar-collapse-btn {
+  border: none;
+  background: rgba(0,0,0,0.08);
+  color: var(--ink);
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.app-sidebar-collapse-btn:hover { background: rgba(0,0,0,0.16); }
+
+/* The little tab that appears clipped to the left edge once the sidebar is
+   hidden — a small, unobtrusive way back in, rather than the sidebar just
+   vanishing with no way to reopen it. Desktop-only (hidden on mobile below,
+   where the top bar's hamburger already serves this purpose). */
+.app-sidebar-reopen {
+  position: fixed;
+  left: 14px; /* sits right at the yellow frame's own edge */
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--ink);
+  color: var(--mustard);
+  border: none;
+  width: 22px;
+  height: 56px;
+  border-radius: 0 10px 10px 0;
+  font-size: 0.95rem;
+  cursor: pointer;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.app-sidebar-reopen:hover { background: #333; }
 
 .app-sidebar-nav {
   display: flex;
@@ -2578,13 +2730,13 @@ input:focus {
   flex: 1;
   display: flex;
   min-width: 0;
-  min-height: 100vh;
+  min-height: 0;
+  height: calc(100vh - 28px);
   background: var(--paper);
 }
 
 .app-body--reader {
-  min-height: 0;
-  height: 100vh;
+  height: calc(100vh - 28px);
 }
 
 .app-main {
@@ -2637,7 +2789,16 @@ input:focus {
    RESPONSIVE — mobile sidebar becomes a drawer
 ══════════════════════════════════ */
 @media (max-width: 860px) {
-  .app-shell {
+  /* The yellow frame gets noticeably thinner on small screens — every pixel
+     of screen width matters more on a phone than the exact frame thickness. */
+  .app-frame {
+    padding: 8px;
+  }
+  .app-shell,
+  .app-shell--reader {
+    min-height: calc(100vh - 16px);
+    height: calc(100vh - 16px);
+    border-radius: 12px;
     flex-direction: column;
   }
 
@@ -2686,8 +2847,12 @@ input:focus {
   }
 
   /* The sidebar itself becomes a fixed, off-canvas drawer — hidden just past
-     the left edge until `.open` slides it fully into view. */
-  .app-sidebar {
+     the left edge until `.open` slides it fully into view. This overrides
+     ".collapsed" (display:none) so the desktop "hide sidebar" preference
+     never blocks the mobile drawer from opening. */
+  .app-sidebar,
+  .app-sidebar.collapsed {
+    display: flex;
     position: fixed;
     top: 0;
     left: 0;
@@ -2701,6 +2866,17 @@ input:focus {
     transform: translateX(0);
   }
 
+  /* The desktop-only reopen tab has no purpose on mobile — the top bar's
+     hamburger button already does this job there. */
+  .app-sidebar-reopen {
+    display: none;
+  }
+  /* Same for the in-sidebar collapse button — mobile closes the drawer via
+     the backdrop or Escape, not by "hiding" a persistent sidebar. */
+  .app-sidebar-collapse-btn {
+    display: none;
+  }
+
   .app-mobile-backdrop {
     display: block;
     position: fixed;
@@ -2712,7 +2888,9 @@ input:focus {
   }
 
   .app-body {
+    height: auto;
     min-height: 0;
+    flex: 1;
   }
 
   .app-aside { display: none; }
@@ -2720,6 +2898,7 @@ input:focus {
 
   .app-body--reader .app-main { overflow: visible; }
 }
+
 
 
 /* ══════════════════════════════════
