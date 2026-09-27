@@ -100,13 +100,13 @@ function Dashboard() {
 
                     <AddWord onWordAdded={handleWordAdded} />
 
-                    {/* ── Difficult Words Detector ── */}
-                    <div style={{ marginBottom: "28px" }}>
-                        <p className="section-title">Auto-detect difficult words from PDF</p>
-
+                    {/* ── Quick actions row: Upload PDF + Speaking Coach, side by side
+                         right under the Add box (matches the compact pill-button
+                         layout from the reference design, instead of one big
+                         full-width button on its own line). ── */}
+                    <div className="dashboard-quick-actions">
                         <button
-                            className="btn btn-ghost"
-                            style={{ width: "auto", marginBottom: "12px" }}
+                            className="pill-btn"
                             onClick={() => diffRef.current.click()}
                             disabled={diffAnalyzing}
                         >
@@ -115,17 +115,24 @@ function Dashboard() {
                                     <span className="loading-dots" style={{ display: "inline-flex", gap: "3px" }}><span/><span/><span/></span>
                                     Analysing…
                                   </span>
-                                : "📄 Upload PDF to find difficult words"
+                                : <>📄 Upload PDF</>
                             }
                         </button>
-                        <input
-                            ref={diffRef}
-                            type="file"
-                            accept=".pdf"
-                            style={{ display: "none" }}
-                            onChange={handleDifficultyAnalyze}
-                        />
+                        <button className="pill-btn" onClick={() => navigate("/speaking")}>
+                            🎤 Speaking Coach
+                        </button>
+                    </div>
+                    <input
+                        ref={diffRef}
+                        type="file"
+                        accept=".pdf"
+                        style={{ display: "none" }}
+                        onChange={handleDifficultyAnalyze}
+                    />
 
+                    {/* ── Difficult Words Detector results (only appears once a PDF
+                         has actually been analyzed via the "Upload PDF" pill above) ── */}
+                    <div style={{ marginBottom: "28px" }}>
                         {diffMsg && (
                             <div style={{
                                 padding: "10px 14px",
@@ -231,12 +238,14 @@ function Dashboard() {
                         </div>
                     )}
 
-                    {/* Recent words */}
+                    {/* Recently added — shows just the single most recent word (not the
+                        whole list) so the dashboard stays a quick glance, not a feed.
+                        "View all" below links out to the full list on /vocabulary. */}
                     {words.length > 0 && !newWordProfile && !loadingProfile && (
                         <div>
-                            <p className="section-title">Recent words</p>
+                            <p className="section-title">Recently added</p>
                             <div className="word-list">
-                                {words.slice(0, 5).map(w => (
+                                {words.slice(0, 1).map(w => (
                                     <div key={w._id} className="word-card">
                                         <div className="word-card-top">
                                             <h3
@@ -253,7 +262,7 @@ function Dashboard() {
                                     </div>
                                 ))}
                             </div>
-                            {words.length > 5 && (
+                            {words.length > 1 && (
                                 <button
                                     className="btn btn-ghost"
                                     onClick={() => navigate("/vocabulary")}
