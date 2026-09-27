@@ -181,11 +181,32 @@ exports.addWord = async (req, res) => {
             return res.status(400).json({ message: "Word is required" });
         }
 
-        const { meaning, exampleSentence, synonyms } = await getMeaning(word.trim().toLowerCase());
+        // Normalize once and reuse everywhere below — trim() drops stray spaces,
+        // toLowerCase() means "Gauche", "gauche" and "GAUCHE" are all treated as
+        // the exact same saved word instead of three separate entries.
+        const normalizedWord = word.trim().toLowerCase();
+
+        // ── Duplicate check ──
+        // Look for a word this SAME user already has saved (userId + word together)
+        // before doing any dictionary lookup or creating a new document. Without this,
+        // clicking "Add" twice — or re-adding a word already in the list — silently
+        // created a second, identical row instead of telling the user it's already there.
+        const alreadySaved = await Word.findOne({ userId, word: normalizedWord });
+        if (alreadySaved) {
+            // 409 Conflict is the standard HTTP status for "this already exists" —
+            // the frontend uses this specific code to show a friendly inline message
+            // instead of treating it like a generic failure.
+            return res.status(409).json({
+                message: `"${normalizedWord}" is already in your word list.`,
+                word: alreadySaved // send the existing entry back in case the frontend wants to show/link to it
+            });
+        }
+
+        const { meaning, exampleSentence, synonyms } = await getMeaning(normalizedWord);
 
         const newWord = await Word.create({
             userId,
-            word: word.trim().toLowerCase(),
+            word: normalizedWord,
             meaning,
             exampleSentence,
             synonyms,

@@ -187,11 +187,51 @@ const axios = require("axios");
 const { syncContactToHubspot } = require("../utils/hubspotService");
 // New: pulls in our HubSpot sync function so we can call it during registration below.
 
+// signToken(): bundles a user's Mongo _id into a signed JWT (JSON Web Token) — a
+// tamper-proof string the frontend stores and sends back on every request so the
+// server knows who's asking without re-checking the password each time.
+// expiresIn was previously "1d" (one day), which is why people kept getting logged
+// out overnight even though nothing was wrong — the token itself was expiring, not
+// a real bug in the login flow. Bumped to "30d" so a login sticks around for a
+// month of inactivity, which is what "stay logged in" normally means to a user.
 const signToken = (userId) => jwt.sign(
-    { id: userId },
-    process.env.JWT_SECRET,
-    { expiresIn: "1d" }
+    { id: userId }, // payload: only the user's id is embedded, nothing sensitive
+    process.env.JWT_SECRET, // secret key used to sign + later verify the token
+    { expiresIn: "30d" } // token (and therefore the logged-in session) now lasts 30 days
 );
+
+// ── Shared validation helpers (used by both register and login below) ──
+
+// A simple, widely-used pattern for "looks like an email": something, an @, something,
+// a dot, something. Not a full RFC-5322 validator (those are notoriously overkill) —
+// just enough to catch obvious typos like "mariam@gmail" or "mariamgmail.com".
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Centralizes the register/login input checks so both routes give the same,
+// predictable error messages instead of duplicating the same if-checks twice.
+// Returns a string describing the FIRST problem found, or null if everything's fine.
+const validateCredentials = ({ name, email, password, isRegister }) => {
+    // isRegister is true only on the register route — login doesn't need a name.
+    if (isRegister && (!name || !name.trim())) {
+        return "Name is required.";
+    }
+    if (!email || !email.trim()) {
+        return "Email is required.";
+    }
+    if (!EMAIL_REGEX.test(email.trim())) {
+        return "Please enter a valid email address.";
+    }
+    if (!password) {
+        return "Password is required.";
+    }
+    // Only enforce a minimum length on register — an existing account created before
+    // this rule shouldn't suddenly be told its (already-set) password is "too short"
+    // just to log in.
+    if (isRegister && password.length < 6) {
+        return "Password must be at least 6 characters long.";
+    }
+    return null; // no problems found
+};
 
 /**
  * Send a welcome email via Resend. Fire-and-forget: registration must
@@ -242,9 +282,23 @@ exports.register = async (req, res) => {
 
     const { name, email, password } = req.body;
 
+    // Run the shared checks (name present, email looks real, password long enough)
+    // BEFORE touching the database at all — fail fast with a clear message instead
+    // of e.g. letting bcrypt or Mongo throw a confusing error on bad input.
+    const validationError = validateCredentials({ name, email, password, isRegister: true });
+    if (validationError) {
+        return res.status(400).json({ message: validationError });
+    }
+
+    // Normalize the email once here so "Mariam@Gmail.com" and "mariam@gmail.com"
+    // are always treated as the exact same account — trim() drops stray leading/
+    // trailing spaces, toLowerCase() removes case as a source of "duplicate" accounts.
+    const normalizedEmail = email.trim().toLowerCase();
+    const trimmedName = name.trim();
+
     try {
-        // check if user exists
-        const exists = await User.findOne({ email });
+        // check if user exists (now checked against the normalized email)
+        const exists = await User.findOne({ email: normalizedEmail });
         if (exists) {
             return res.status(400).json({ message: "User already exists" });
         }
@@ -254,8 +308,8 @@ exports.register = async (req, res) => {
 
         // create user
         const user = await User.create({
-            name,
-            email,
+            name: trimmedName,
+            email: normalizedEmail,
             password: hashedPassword
         });
 
@@ -264,12 +318,12 @@ exports.register = async (req, res) => {
         const token = signToken(user._id);
 
         // Don't await — email sending shouldn't delay or risk the response.
-        sendWelcomeEmail(name, email);
+        sendWelcomeEmail(trimmedName, normalizedEmail);
 
         // New: sync this new user into HubSpot as a Contact.
         // Same fire-and-forget pattern as sendWelcomeEmail above — no "await" here,
         // so a slow or failed HubSpot call can never delay or break the user's registration response.
-        syncContactToHubspot(name, email);
+        syncContactToHubspot(trimmedName, normalizedEmail);
 
         res.json({
             message: "User registered successfully 💛",
@@ -289,8 +343,20 @@ exports.login = async (req, res) => {
 
     const { email, password } = req.body;
 
+    // Same shared checks as register (minus the name/min-length rule, since
+    // isRegister defaults to falsy) — catches an empty or malformed email/password
+    // before ever hitting the database.
+    const validationError = validateCredentials({ email, password, isRegister: false });
+    if (validationError) {
+        return res.status(400).json({ message: validationError });
+    }
+
+    // Normalize the same way register does, so a user who typed their email in a
+    // different case at signup can still log in without it being treated as "not found".
+    const normalizedEmail = email.trim().toLowerCase();
+
     try {
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email: normalizedEmail });
         if (!user) return res.status(400).json({ message: "User not found" });
 
         const isMatch = await bcrypt.compare(password, user.password);
