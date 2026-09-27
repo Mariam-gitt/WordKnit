@@ -57,4 +57,12 @@ const wordSchema = new mongoose.Schema({
     timestamps: true
 });
 
+// Compound unique index: for any ONE user, the same "word" value can only appear
+// once in this collection. This is a second, database-level safety net on top of
+// the findOne() duplicate check in wordController.js — the controller check stops
+// the normal "click Add twice" case, but this index guarantees it even if two
+// requests somehow land at the exact same instant (a "race condition"), which a
+// plain JS if-check running in Node can't fully protect against on its own.
+wordSchema.index({ userId: 1, word: 1 }, { unique: true });
+
 module.exports = mongoose.model("Word", wordSchema);
