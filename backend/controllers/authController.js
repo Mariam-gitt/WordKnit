@@ -357,16 +357,22 @@ exports.login = async (req, res) => {
 
     try {
         const user = await User.findOne({ email: normalizedEmail });
-        if (!user) return res.status(400).json({ message: "User not found" });
+
+        // SECURITY: one identical message for "no such email" AND "wrong password". Two different messages
+        // would let an attacker test which emails have accounts (called "user enumeration").
+        const INVALID_LOGIN = "Invalid email or password.";
+        if (!user) return res.status(400).json({ message: INVALID_LOGIN });
 
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).json({ message: "Invalid password" });
+        if (!isMatch) return res.status(400).json({ message: INVALID_LOGIN });
 
         const token = signToken(user._id);
         res.json({ token, user: user.name });
 
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        // SECURITY: log the real reason on the server, but send the user a generic message so internal details never leak.
+        console.log("LOGIN ERROR:", error.message);
+        res.status(500).json({ message: "Login failed. Please try again." });
     }
 };
 
@@ -381,9 +387,11 @@ exports.deleteAccount = async (req, res) => {
         const Word     = require("../models/Word");
         const Document = require("../models/Document");
         const Bookmark = require("../models/Bookmark");
+        const SpeakingSession = require("../models/SpeakingSession"); // NEW: speaking sessions were being left behind after account deletion
 
         // Delete all user data in parallel
         await Promise.all([
+            SpeakingSession.deleteMany({ userId }), // NEW: remove this user's speaking-practice history too
             Word.deleteMany({ userId }),
             Bookmark.deleteMany({ userId }),
             Document.deleteMany({ userId }),
