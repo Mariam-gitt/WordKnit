@@ -11,6 +11,7 @@ function WordList({ words, onStatusChange }) {
     const [editingNote, setEditingNote] = useState(null);   // word._id being edited
     const [noteText, setNoteText] = useState("");           // draft note value
     const [savingNote, setSavingNote] = useState(null);
+    const [regenerating, setRegenerating] = useState(null); // NEW: _id of the word whose meaning is being rebuilt (null = none), used to show "…" on its button
 
     const toggleStatus = async (word) => {
         const newStatus = word.status === "learned" ? "review" : "learned";
@@ -20,6 +21,19 @@ function WordList({ words, onStatusChange }) {
             if (onStatusChange) onStatusChange();
         } catch (err) { console.log(err); }
         finally { setUpdating(null); }
+    };
+
+    const regenerateMeaning = async (word) => {                         // NEW: runs when "↻ Regenerate" is clicked; word = the saved word object from the list
+        if (!window.confirm(`Regenerate the meaning of "${word.word}"? The current meaning will be replaced.`)) return; // ask first, because the old meaning is overwritten
+        setRegenerating(word._id);                                      // remember which word is busy so its button shows "…"
+        try {                                                           // try/catch so a failed request shows a message instead of breaking the page
+            await api.patch(`/words/${word._id}/regenerate`);           // browser → server: "rebuild this word's meaning"
+            if (onStatusChange) onStatusChange();                       // child → parent: tell Vocabulary.js to re-fetch the list so the new meaning shows up
+        } catch (err) {                                                 // the server said no (AI busy, word missing, ...)
+            alert(err.response?.data?.message || "Failed to regenerate the meaning."); // show the server's message, or a default one
+        } finally {                                                     // runs whether it worked or failed
+            setRegenerating(null);                                      // stop showing the busy "…" state
+        }
     };
 
     const handleDelete = async (e, word) => {
@@ -121,10 +135,20 @@ function WordList({ words, onStatusChange }) {
                                     </button>
                                 </div>
                             </div>
-                            <p className="meaning">{w.meaning}</p>
+                            <p className="meaning">{w.partOfSpeech && <em>({w.partOfSpeech}) </em>}{w.meaning}</p> {/* NEW: shows "(noun)" etc. in italics before the meaning when we have it */}
                             {w.exampleSentence && w.exampleSentence !== "No example available" && (
                                 <p className="example">"{w.exampleSentence}"</p>
                             )}
+
+                            {/* NEW: Regenerate button — rebuilds this word's meaning */}
+                            <button
+                                className="word-note-add"
+                                onClick={() => regenerateMeaning(w)}
+                                disabled={regenerating === w._id}
+                                title="Rebuild this meaning from the dictionary + AI"
+                            >
+                                {regenerating === w._id ? "Regenerating…" : "↻ Regenerate meaning"}
+                            </button>
 
                             {/* Note section */}
                             {editingNote === w._id ? (
