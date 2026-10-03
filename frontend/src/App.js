@@ -59,7 +59,6 @@ export default function App() {
                     <Route path="/vocabulary" element={<ProtectedRoute><Vocabulary /></ProtectedRoute>} />
                     <Route path="/reader" element={<ProtectedRoute><PDFReader /></ProtectedRoute>} />
                     <Route path="/profile/:word" element={<ProtectedRoute><WordProfile /></ProtectedRoute>} />
-                    <Route path="/voice" element={<ProtectedRoute><VoiceAssistant /></ProtectedRoute>} />
                     <Route path="/speaking" element={<ProtectedRoute><SpeakingPractice /></ProtectedRoute>} />
                 </Routes>
             </Suspense>
