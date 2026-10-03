@@ -2,10 +2,16 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const connectDB = require("./config/db");
+const { aiLimiter } = require("./middleware/rateLimiters"); // SECURITY: limits how often the paid-AI routes can be called
 
 dotenv.config();
 
 const app = express();
+
+// SECURITY: this app sits behind a proxy (Vercel in production, nginx in Docker). "trust proxy" = 1 tells Express to
+// believe the proxy about the visitor's real IP address. Without it every visitor would look like the same IP,
+// and the rate limiter would count all users together instead of each person separately.
+app.set("trust proxy", 1);
 
 // CORS lets the deployed frontend (a different domain) call this API. "*" allows any
 // origin — fine for now since there's no cookie-based auth, but tighten this to your
@@ -44,7 +50,9 @@ app.get("/", (req, res) => res.send("Vocabulary App Backend is running 🚀"));
 // Note: calls the HubSpot API directly here (rather than reusing syncContactToHubspot),
 // because that function intentionally swallows its own errors so it never breaks real
 // signups — which means it wouldn't show us a failure here either.
-app.get("/api/test-hubspot", async (req, res) => {
+// SECURITY: this debug route creates a real HubSpot contact and has no login check, so it is only registered
+// outside production (NODE_ENV !== "production"). On a deployed server it simply doesn't exist (404).
+if (process.env.NODE_ENV !== "production") app.get("/api/test-hubspot", async (req, res) => {
     const axios = require("axios");
     // Check first whether the token even exists in this environment — this alone tells us
     // if the Vercel env var actually reached the running app.
@@ -80,10 +88,9 @@ app.get("/api/test-hubspot", async (req, res) => {
 
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/words", require("./routes/wordRoutes"));
-app.use("/api/quiz", require("./routes/quizRoutes"));
 app.use("/api/pdf", require("./routes/pdfRoutes"));
-app.use("/api/contextual", require("./routes/contextualRoutes"));
-app.use("/api/speaking", require("./routes/speakingRoutes")); // speaking-practice: STT -> Groq LLM -> TTS conversation loop
+app.use("/api/contextual", aiLimiter, require("./routes/contextualRoutes")); // SECURITY: aiLimiter = max 150 AI calls / 15 min / IP
+app.use("/api/speaking", aiLimiter, require("./routes/speakingRoutes")); // speaking-practice: STT -> Groq LLM -> TTS conversation loop
 // OCR is parked for now (works on your Hugging Face Space, but not reliable yet) — set
 // OCR_SERVICE_URL and uncomment this line whenever you're ready to bring it back live.
 // app.use("/api/ocr", require("./routes/ocrRoutes"));
