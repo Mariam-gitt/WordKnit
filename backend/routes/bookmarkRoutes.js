@@ -2,6 +2,8 @@ const express  = require("express");
 const router   = express.Router();
 const protect  = require("../middleware/authMiddleware");
 const Bookmark = require("../models/Bookmark");
+const Document = require("../models/Document"); // NEW: used to check the PDF really belongs to the logged-in user
+const mongoose = require("mongoose");           // NEW: used to check that documentId looks like a real MongoDB id
 
 /* ─────────────────────────────────────────────────────────
    POST /api/bookmarks
@@ -13,6 +15,19 @@ router.post("/", protect, async (req, res) => {
 
         if (!documentId || !text || !page) {
             return res.status(400).json({ message: "documentId, text, and page are required" });
+        }
+
+        // NEW (validation): text must really be text, and documentId must look like a MongoDB id,
+        // otherwise .trim() or the database lookup below could crash with a confusing 500 error.
+        if (typeof text !== "string" || !mongoose.isValidObjectId(documentId)) {
+            return res.status(400).json({ message: "Invalid documentId or text" });
+        }
+
+        // NEW (SECURITY): only allow a bookmark on a document THIS user owns. Before, anyone could attach
+        // bookmarks to any document id they could guess. Document.exists() answers yes/no without loading the PDF.
+        const ownsDocument = await Document.exists({ _id: documentId, userId: req.user });
+        if (!ownsDocument) {
+            return res.status(404).json({ message: "Document not found" }); // 404 on purpose: don't reveal whether someone else's document exists
         }
 
         const bookmark = await Bookmark.create({

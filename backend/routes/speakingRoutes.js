@@ -10,7 +10,10 @@ const {
 
 // Audio clips here are just a few seconds of speech — memoryStorage keeps the whole
 // upload in RAM just long enough to forward it to Groq, same pattern ocrRoutes.js uses.
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 } // SECURITY: refuse audio bigger than 10 MB, so nobody can fill the server memory with huge uploads
+});
 
 router.get("/start", protect, startConversation);           // kicks off a new conversation, no audio needed
 router.post("/turn", protect, upload.single("audio"), handleTurn); // one voice exchange — "audio" must match the FormData field name the frontend sends
@@ -26,5 +29,13 @@ router.delete("/sessions", protect, deleteAllSessions);      // clear all (the H
 
 router.get("/level", protect, getLevel);                     // read the learner's saved difficulty level
 router.put("/level", protect, setLevel);                     // save a new difficulty level choice
+
+// SECURITY: turn multer's "file too big" error into a clear 413 message instead of a generic crash.
+router.use((err, req, res, next) => {
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+        return res.status(413).json({ message: "Audio is too large (maximum 10 MB)." }); // 413 = payload too large
+    }
+    next(err); // anything else: pass it along to Express's normal error handling
+});
 
 module.exports = router;

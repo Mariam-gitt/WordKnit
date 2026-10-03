@@ -31,17 +31,18 @@ const express = require("express");
 const router = express.Router();
 const { getWords, addWord, getQuiz, updateStatus, updateNote, previewMeaning, regenerateMeaning, recordReview } = require("../controllers/wordController");
 const protect = require("../middleware/authMiddleware");
+const { aiLimiter } = require("../middleware/rateLimiters"); // SECURITY: caps calls to routes that use the paid AI (150 / 15 min / IP)
 
-router.post("/", protect, addWord);
+router.post("/", protect, aiLimiter, addWord);          // SECURITY: adding a word may call the AI
 router.get("/", protect, getWords);
-router.get("/quiz", protect, getQuiz);
+router.get("/quiz", protect, aiLimiter, getQuiz);       // SECURITY: each quiz question calls the AI for wrong answers
 // Voice assistant uses this to hear a meaning WITHOUT saving it to the word list.
 // Placed above "/:id/..." routes isn't needed here since the path shape differs,
 // but it must come before any future "/:something" catch-all route is added.
-router.get("/preview/:word", protect, previewMeaning);
+router.get("/preview/:word", protect, aiLimiter, previewMeaning); // SECURITY: a preview may call the AI
 router.patch("/:id/status", protect, updateStatus);
 router.patch("/:id/note", protect, updateNote);
-router.patch("/:id/regenerate", protect, regenerateMeaning); // NEW: rebuild one word's meaning (the "↻ Regenerate" button)
+router.patch("/:id/regenerate", protect, aiLimiter, regenerateMeaning); // SECURITY: regenerating calls the AI // NEW: rebuild one word's meaning (the "↻ Regenerate" button)
 router.post("/:id/review", protect, recordReview); // NEW: save one quiz answer / flashcard rating on the word (right/wrong counts, streak, learned status)
 
 module.exports = router;
