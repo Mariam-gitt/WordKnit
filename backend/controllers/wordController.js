@@ -340,8 +340,21 @@ exports.getQuiz = async (req, res) => {
             return res.status(400).json({ message: "Add at least 4 words to start the quiz!" });
         }
 
-        const randomIndex = Math.floor(Math.random() * words.length);
-        const correctWord = words[randomIndex];
+        // ── NEW (no-repeat fix): read the list of word ids the browser has already asked ──
+        const excludeText = req.query.exclude || "";                      // req.query = the part after "?" in the URL, e.g. /quiz?exclude=id1,id2 (empty text if missing)
+        const excludeIds = excludeText.split(",").filter(Boolean);        // turn "id1,id2" into ["id1","id2"]; filter(Boolean) drops empty pieces so "" becomes []
+        const excludeSet = new Set(excludeIds);                           // a Set = a list that can answer "is this id in here?" very quickly
+
+        // ── NEW: keep only the words that have NOT been asked yet this round ──
+        const freshWords = words.filter(w => !excludeSet.has(w._id.toString())); // _id is a MongoDB ObjectId, .toString() turns it into plain text so we can compare
+
+        // ── NEW: every word has been asked once, so tell the browser the round is finished ──
+        if (freshWords.length === 0) {                                    // nothing left to ask
+            return res.json({ roundComplete: true, totalWords: words.length }); // send a "finished" signal (as JSON) instead of a question, then stop
+        }
+
+        const randomIndex = Math.floor(Math.random() * freshWords.length); // random position, but now ONLY among unasked words (was words.length)
+        const correctWord = freshWords[randomIndex];                      // the word we ask about (was words[randomIndex])
         const correctAnswer = correctWord.meaning;
 
         // ── Try AI-generated similar-meaning decoys first ──
@@ -371,6 +384,7 @@ exports.getQuiz = async (req, res) => {
             .map(o => o.opt);
 
         res.json({
+            wordId: correctWord._id,                                      // NEW: this word's id, so the browser can cross it off its "asked" list
             word: correctWord.word,
             correctAnswer,
             options: shuffledOptions,
