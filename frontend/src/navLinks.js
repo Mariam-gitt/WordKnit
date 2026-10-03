@@ -4,6 +4,5 @@ export const NAV_LINKS = [
     { path: "/reader",     icon: "◎", label: "PDF Reader" },
     { path: "/flashcards", icon: "▣", label: "Flashcards" },
     { path: "/quiz",       icon: "◈", label: "Quiz" },
-    { path: "/voice",      icon: "🎤", label: "Voice Assistant" },
     { path: "/speaking",   icon: "💬", label: "Speaking Practice" },
 ];
