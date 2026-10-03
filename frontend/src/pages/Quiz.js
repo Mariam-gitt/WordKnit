@@ -12,12 +12,13 @@ function Quiz() {
     const [streak, setStreak]     = useState(0);
     const [askedIds, setAskedIds]           = useState([]);    // NEW: ids of words already asked this round (starts empty)
     const [roundComplete, setRoundComplete] = useState(false); // NEW: true once every word has been asked
+    const [statusNote, setStatusNote] = useState("");           // NEW: small message after an answer, e.g. "now marked as learned" (empty = nothing to say)
 
     useEffect(() => { loadQuiz([]); }, []);                        // NEW: first load sends an empty list because nothing has been asked yet
 
     const loadQuiz = async (excludeIds) => {                       // NEW: excludeIds = already-asked word ids, passed in by whoever calls us
         try {                                                      // try/catch so a failed request shows a message instead of breaking the page
-            setError(""); setQuiz(null); setAnswered(false); setSelected(null); // reset the screen for the next question
+            setError(""); setQuiz(null); setAnswered(false); setSelected(null); setStatusNote(""); // reset the screen for the next question (NEW: also clear the status message)
             const res = await api.get("/words/quiz", {             // browser → server: ask for the next question
                 params: { exclude: excludeIds.join(",") }          // NEW: params = what goes after "?" in the URL, so [a,b] becomes /words/quiz?exclude=a,b
             });
@@ -41,6 +42,24 @@ function Quiz() {
         if (correct) { setScore(s => s + 1); setStreak(s => s + 1); }
         else { setStreak(0); }
         setAnswered(true);
+        saveResult(opt);                                           // NEW: tell the server which option was picked so it can save the result
+    };
+
+    // NEW: browser → server: save this answer on the word's scorecard (right/wrong counts, streak, learned status)
+    const saveResult = async (opt) => {                            // opt = the option text the user clicked
+        try {                                                      // try/catch so a failed save never breaks the quiz
+            const res = await api.post(`/words/${quiz.wordId}/review`, { // POST = send data; quiz.wordId = which word this question was about
+                mode: "quiz",                                      // tells the server this is a quiz answer (not a flashcard)
+                selected: opt                                      // the option the user picked; the SERVER decides if it was right
+            });
+            if (res.data.becameLearned) {                          // server → browser: this answer just made the word "learned"
+                setStatusNote(`🎉 "${quiz.word}" is now marked as learned!`);
+            } else if (res.data.backToReview) {                    // server → browser: a wrong answer sent a learned word back to review
+                setStatusNote(`"${quiz.word}" moved back to Review.`);
+            }
+        } catch (err) {                                            // saving failed (network, expired login, ...)
+            console.log("Could not save quiz result:", err.message); // just log it; the quiz itself keeps working
+        }
     };
 
     const getClass = (opt) => {
@@ -195,6 +214,11 @@ function Quiz() {
                                         {streak > 1 && selected === quiz.correctAnswer && (
                                             <p style={{ fontSize: "0.8rem", color: "var(--green)", marginTop: "3px" }}>
                                                 {streak} in a row! 🔥
+                                            </p>
+                                        )}
+                                        {statusNote && (                                           /* NEW: shows the "learned" / "back to review" message */
+                                            <p style={{ fontSize: "0.8rem", color: "var(--text-2)", marginTop: "3px" }}>
+                                                {statusNote}
                                             </p>
                                         )}
                                     </div>
