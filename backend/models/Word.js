@@ -47,7 +47,14 @@ const wordSchema = new mongoose.Schema({
         default: 0
     },
 
-    // Flashcard review tracking
+    // NEW: right answers IN A ROW (quiz or flashcard). Resets to 0 on a wrong answer.
+    // When it reaches LEARNED_AFTER (3, set in wordController.js) the word becomes "learned".
+    correctStreak: {
+        type: Number,
+        default: 0
+    },
+
+    // Last time the user practised this word (quiz or flashcard) — now set by recordReview()
     lastReviewed: {
         type: Date
     },
