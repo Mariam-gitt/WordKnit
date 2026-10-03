@@ -29,7 +29,7 @@
 
 const express = require("express");
 const router = express.Router();
-const { getWords, addWord, getQuiz, updateStatus, updateNote, previewMeaning } = require("../controllers/wordController");
+const { getWords, addWord, getQuiz, updateStatus, updateNote, previewMeaning, regenerateMeaning } = require("../controllers/wordController");
 const protect = require("../middleware/authMiddleware");
 
 router.post("/", protect, addWord);
@@ -41,6 +41,7 @@ router.get("/quiz", protect, getQuiz);
 router.get("/preview/:word", protect, previewMeaning);
 router.patch("/:id/status", protect, updateStatus);
 router.patch("/:id/note", protect, updateNote);
+router.patch("/:id/regenerate", protect, regenerateMeaning); // NEW: rebuild one word's meaning (the "↻ Regenerate" button)
 
 module.exports = router;
 
