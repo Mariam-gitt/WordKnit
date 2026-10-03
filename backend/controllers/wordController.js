@@ -377,6 +377,37 @@ Respond in this exact JSON format, nothing else:
 /**
  * GENERATE QUIZ
  */
+/**
+ * How many raffle tickets a word gets when the quiz picks the next question.
+ * More tickets = more likely to be picked sooner. In plain words:
+ *   - a word you are still learning gets 3 tickets, a "learned" word only 1
+ *   - each past mistake adds 1 ticket (at most 4)...
+ *   - ...but each right answer in a row takes 1 ticket back, so a word you fixed stops being "weak"
+ * Examples: brand-new word = 3 | failed 4 times, 0 right since = 7 | learned, no recent mistakes = 1
+ */
+const ticketsFor = (w) => {                                           // w = one saved word (a plain object, because getQuiz uses .lean())
+    const wrong = w.wrongCount || 0;                                   // .lean() skips schema defaults, so a missing number must be treated as 0
+    const streak = w.correctStreak || 0;                               // right answers in a row (0 if the word was never practised)
+    const base = w.status === "learned" ? 1 : 3;                       // learned words need less practice than words still in "review"
+    const weakBonus = Math.max(0, Math.min(wrong, 4) - streak);        // each mistake adds a ticket (max 4), each right-in-a-row removes one, never below 0
+    return base + weakBonus;                                           // total tickets for this word
+};
+
+/**
+ * Pick ONE word from the list using the raffle: every ticket has the same chance,
+ * so a word with 7 tickets is 7 times as likely as a word with 1 ticket.
+ */
+const pickWeightedWord = (list) => {                                  // list = the words still allowed to be asked
+    const tickets = list.map(ticketsFor);                              // one ticket count per word, in the same order as the list
+    const totalTickets = tickets.reduce((sum, t) => sum + t, 0);       // add them all up = the size of the raffle drum
+    let draw = Math.random() * totalTickets;                           // a random point inside the drum (0 up to totalTickets)
+    for (let i = 0; i < list.length; i++) {                            // walk through the words one by one
+        draw -= tickets[i];                                            // use up this word's tickets
+        if (draw < 0) return list[i];                                  // the draw landed inside this word's tickets, so this is the winner
+    }
+    return list[list.length - 1];                                      // safety net (only reached through tiny rounding), pick the last word
+};
+
 exports.getQuiz = async (req, res) => {
     try {
         // .lean() here too — this data is only read to build quiz questions, never saved back.
@@ -399,8 +430,7 @@ exports.getQuiz = async (req, res) => {
             return res.json({ roundComplete: true, totalWords: words.length }); // send a "finished" signal (as JSON) instead of a question, then stop
         }
 
-        const randomIndex = Math.floor(Math.random() * freshWords.length); // random position, but now ONLY among unasked words (was words.length)
-        const correctWord = freshWords[randomIndex];                      // the word we ask about (was words[randomIndex])
+        const correctWord = pickWeightedWord(freshWords);                 // NEW: raffle among unasked words — weak words hold more tickets, so they tend to come up earlier (was a plain random pick)
         const correctAnswer = correctWord.meaning;
 
         // ── Try AI-generated similar-meaning decoys first ──
