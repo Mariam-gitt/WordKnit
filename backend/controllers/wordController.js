@@ -2,139 +2,184 @@ const Word = require("../models/Word"); // per-user saved words (their personal 
 const WordCache = require("../models/WordCache"); // shared global cache of meanings — one row per unique word, reused by every user
 const axios = require("axios"); // library used to make HTTP requests to dictionaryapi.dev and Groq
 
+// MEANING_VERSION = the "version number" of our recipe for writing meanings.
+// Cached meanings saved by an OLDER recipe have a lower (or missing) number, so getMeaning() treats them as out-of-date and rebuilds them with the new recipe.
+// Bump this number whenever you improve the recipe again and want old cached meanings refreshed.
+const MEANING_VERSION = 2;
+
 /**
- * Ask Groq to write a real dictionary-style definition for a word neither
- * the RAG service nor the free Dictionary API could find. Same JSON-prompt
- * pattern as generateSimilarDecoys() below. Returns null on any failure so
- * the caller can fall back to the plain placeholder message.
+ * Get the real dictionary senses (meanings) of a word from dictionaryapi.dev.
+ * A "sense" = one specific meaning of a word (e.g. "bank" has the money sense and the river sense).
+ * Returns a list of senses, or an empty list if the dictionary is down / doesn't know the word.
  */
-const generateMeaningWithGroq = async (word) => {
-    if (!process.env.GROQ_API_KEY) return null;
-
-    const prompt = `Give a dictionary-style definition for the English word "${word}".
-
-Respond in this exact JSON format, nothing else:
-{
-  "meaning": "a concise one-sentence definition",
-  "exampleSentence": "one natural example sentence using the word",
-  "synonyms": ["synonym1", "synonym2", "synonym3"]
-}
-
-If "${word}" is not a real English word (e.g. a typo or made-up string), respond with:
-{ "meaning": null, "exampleSentence": null, "synonyms": [] }`;
-
-    try {
-        const groqRes = await axios.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            {
-                model: "openai/gpt-oss-120b",
-                messages: [{ role: "user", content: prompt }],
-                temperature: 0.3,
-                max_tokens: 300
-            },
-            {
-                headers: {
-                    "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
-                    "Content-Type": "application/json"
-                },
-                timeout: 10000
-            }
+const fetchDictionarySenses = async (word) => {                       // async = this function waits for the internet; "word" is the lowercase word to look up
+    try {                                                              // try/catch = if the request fails, jump to catch instead of crashing the server
+        const response = await axios.get(                              // axios.get = ask another website for data (browser-style GET request)
+            `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`, // encodeURIComponent makes the word safe inside a URL (handles spaces/symbols)
+            { timeout: 5000 }                                          // give up after 5 seconds because this free API can be slow
         );
-
-        const content = groqRes.data.choices[0].message.content.trim();
-        const cleaned = content.replace(/```json|```/g, "").trim();
-        const parsed = JSON.parse(cleaned);
-
-        if (!parsed.meaning) return null;
-        return {
-            meaning: parsed.meaning,
-            exampleSentence: parsed.exampleSentence || "No example available",
-            synonyms: Array.isArray(parsed.synonyms) ? parsed.synonyms : [],
-            source: "AI Generated"
-        };
-    } catch (err) {
-        console.log(`[Groq meaning] Failed for "${word}":`, err.response?.data || err.message);
-        return null;
+        const senses = [];                                             // we will collect every sense we find in this list
+        for (const entry of response.data || []) {                     // the API returns a list of "entries" (one per word form); loop over each one
+            for (const block of entry.meanings || []) {                // each entry has "meanings" blocks, one per part of speech (noun, verb, ...)
+                for (const def of (block.definitions || []).slice(0, 3)) { // each block has definitions; keep only the first 3 per part of speech so the list stays short
+                    if (def.definition) {                              // skip any empty definition
+                        senses.push({                                  // add one sense to our list as a small object
+                            partOfSpeech: block.partOfSpeech || "",    // noun / verb / adjective ... (empty text if missing)
+                            definition: def.definition,                // the dictionary's own wording
+                            example: def.example || "",                // the dictionary's example sentence, if it has one
+                            synonyms: def.synonyms || []               // the dictionary's synonyms, if it has any
+                        });
+                    }
+                }
+            }
+        }
+        return senses.slice(0, 8);                                     // keep at most 8 senses overall so the AI prompt doesn't get too long
+    } catch (err) {                                                    // covers: word not found (404), API down, timeout, rate limit
+        console.log(`[Dictionary API] Failed for "${word}":`, err.response?.status || err.message); // log why, to help debugging
+        return [];                                                     // an empty list means "the dictionary couldn't help"
     }
 };
 
 /**
- * Order: our own shared cache, then the free dictionary API, then Groq as
- * a last resort.
- *
- * (Previously there was also a Python "RAG" microservice step here, using
- * a custom dictionary extracted from a vocabulary book. It's been removed
- * for two reasons: it depended on a local Python process at
- * "http://localhost:5002" that doesn't exist once this backend is deployed
- * to Vercel — so in production it did nothing but waste a 2-second timeout
- * on every single word — and the extracted definitions themselves turned
- * out to be mostly mis-parsed, e.g. the stored "meaning" for the word
- * "scare" was literally "a. She wanted to help them." — a leftover
- * multiple-choice answer from the book's quiz pages, not a real
- * definition. Removing it made this function both faster and correct.)
- *
- * dictionaryapi.dev is a small donation-funded project that's often slow,
- * missing common words, or fully down (it returned a Cloudflare 522
- * outage as recently as 2026-09-04) — so it can't be the only real
- * source. Groq is already used elsewhere in this app, so it gives a real
- * definition instead of the placeholder in most cases where the free API
- * comes up empty.
+ * Ask Groq (an AI service) to WRITE the meaning of a word in one simple style.
+ * If we have real dictionary senses, the AI must choose from THEM (so it can't make things up).
+ * If the dictionary gave us nothing, the AI writes the meaning on its own.
+ * Returns null on any failure so the caller can use a fallback.
  */
-const getMeaning = async (word) => {
+const generateMeaningWithGroq = async (word, senses = []) => {        // senses = the list from fetchDictionarySenses (can be empty)
+    if (!process.env.GROQ_API_KEY) return null;                        // no API key set = we can't call Groq, so stop here
 
-    // ── Step 0: our own shared cache (fastest — one DB read, no external network call) ──
-    // findOne() looks for a document where "word" matches exactly (mongoose lowercases on save,
-    // and the caller already lowercases too, so this is a clean match).
-    const cached = await WordCache.findOne({ word }).lean(); // .lean(): we only read these fields, never save this doc back
-    if (cached) {
-        return {
-            meaning: cached.meaning,
-            exampleSentence: cached.exampleSentence,
-            synonyms: cached.synonyms,
-            source: cached.source
+    const senseText = senses                                           // turn the senses list into numbered lines of text for the prompt
+        .map((s, i) => `${i + 1}. (${s.partOfSpeech || "?"}) ${s.definition}`) // e.g. "1. (noun) a financial institution"
+        .join("\n");                                                   // put each sense on its own line
+
+    const rules = `Your job:
+- Choose the MOST COMMON everyday sense of the word (the one a learner is most likely to meet).
+- Write its meaning as ONE simple sentence (maximum 20 words) in plain English. Do not use the word itself inside the meaning.
+- Give the part of speech of that sense (noun, verb, adjective, adverb, ...).
+- Give ONE natural example sentence that uses the word in that same sense.
+- Give up to 3 synonyms.`;                                            // the same instructions are used whether or not we have dictionary senses
+
+    const prompt = senses.length                                       // choose the prompt: with dictionary senses, or without
+        ? `You are writing the meaning of an English word for a vocabulary-learning app.
+
+Word: "${word}"
+
+Real dictionary senses (use ONLY these as your source of truth, do not invent a new meaning):
+${senseText}
+
+${rules}
+
+Reply with JSON only, in exactly this shape:
+{ "meaning": "...", "partOfSpeech": "...", "exampleSentence": "...", "synonyms": ["...", "...", "..."] }
+If "${word}" is not a real English word, reply: { "meaning": null }`
+        : `You are writing the meaning of an English word for a vocabulary-learning app.
+
+Word: "${word}"
+
+${rules}
+
+Reply with JSON only, in exactly this shape:
+{ "meaning": "...", "partOfSpeech": "...", "exampleSentence": "...", "synonyms": ["...", "...", "..."] }
+If "${word}" is not a real English word (for example a typo), reply: { "meaning": null }`;
+
+    try {                                                              // try/catch so a Groq failure returns null instead of crashing
+        const groqRes = await axios.post(                              // axios.post = send data to another website
+            "https://api.groq.com/openai/v1/chat/completions",         // Groq's chat endpoint
+            {
+                model: "openai/gpt-oss-120b",                          // the AI model used everywhere else in this app
+                messages: [{ role: "user", content: prompt }],         // our prompt, sent as the user's message
+                temperature: 0.3,                                      // low temperature = steady, less "creative" answers (good for definitions)
+                max_tokens: 600                                        // room for the answer (a bit higher than before, since the prompt is longer)
+            },
+            {
+                headers: {
+                    "Authorization": `Bearer ${process.env.GROQ_API_KEY}`, // proves we're allowed to use Groq (key lives in .env, never in code)
+                    "Content-Type": "application/json"                 // tells Groq we're sending JSON
+                },
+                timeout: 10000                                         // give up after 10 seconds
+            }
+        );
+
+        const content = groqRes.data.choices[0].message.content.trim(); // the AI's reply text, with spaces trimmed off
+        const cleaned = content.replace(/```json|```/g, "").trim();    // remove ```json fences if the AI added them, so JSON.parse can read it
+        const parsed = JSON.parse(cleaned);                            // JSON = text format for data; JSON.parse turns the text into a real JS object
+
+        if (typeof parsed.meaning !== "string" || parsed.meaning.trim() === "") return null; // null / empty meaning = "not a real word" (or a bad reply), so report failure
+        return {                                                       // the clean result we hand back to getMeaning
+            meaning: parsed.meaning.trim(),                            // the simple one-sentence meaning
+            partOfSpeech: (parsed.partOfSpeech || "").toString().trim().toLowerCase(), // noun / verb / ... in lowercase, empty text if missing
+            exampleSentence: parsed.exampleSentence || "No example available", // example sentence, with the same placeholder the app already uses
+            synonyms: Array.isArray(parsed.synonyms) ? parsed.synonyms.slice(0, 3) : [], // keep only a real list, at most 3
+            source: senses.length ? "Dictionary + AI" : "AI Generated" // remember where this meaning came from
+        };
+    } catch (err) {                                                    // network error, timeout, or the AI sent text that isn't valid JSON
+        console.log(`[Groq meaning] Failed for "${word}":`, err.response?.data || err.message); // log why
+        return null;                                                   // tell the caller "this step failed"
+    }
+};
+
+/**
+ * Find the meaning of a word. The order of steps:
+ *   0. our shared cache (only if it was made with the CURRENT recipe)
+ *   1. real dictionary senses  →  2. AI picks the most common sense and rewrites it simply
+ *   3. if the AI fails: an older cached meaning, or the dictionary's first sense
+ *   4. nothing worked: "No meaning found"
+ * options.forceRefresh = true skips the cache so the meaning is rebuilt from scratch (used by "Regenerate").
+ */
+const getMeaning = async (word, options = {}) => {                     // options = optional extra settings; {} means "none given" (so old callers like ocrRoutes still work)
+    const forceRefresh = options.forceRefresh === true;                // true only when the caller explicitly asks for a rebuild
+    let staleCache = null;                                             // will hold an older cached meaning, kept as a safety net
+
+    // ── Step 0: our own shared cache ──
+    if (!forceRefresh) {                                               // normal lookups use the cache; "Regenerate" skips it
+        const cached = await WordCache.findOne({ word }).lean();       // one DB read: is this word already cached? (.lean() = plain object, read-only)
+        if (cached && cached.meaningVersion === MEANING_VERSION) {     // cached AND made with the current recipe = good enough to use
+            return {                                                   // hand back the cached meaning straight away
+                meaning: cached.meaning,
+                partOfSpeech: cached.partOfSpeech || "",
+                exampleSentence: cached.exampleSentence,
+                synonyms: cached.synonyms,
+                source: cached.source
+            };
+        }
+        staleCache = cached || null;                                   // an out-of-date entry (or null): keep it in case everything else fails
+    }
+
+    // ── Step 1: get ALL real dictionary senses (not just the first one) ──
+    const senses = await fetchDictionarySenses(word);                  // may be an empty list if the dictionary is down
+
+    // ── Step 2: let the AI choose the most common sense and rewrite it simply ──
+    const aiMeaning = await generateMeaningWithGroq(word, senses);     // works with or without senses
+    if (aiMeaning) {                                                   // the AI gave a good answer
+        await cacheMeaning(word, aiMeaning);                           // save it for every user (this also replaces any old cached entry)
+        return aiMeaning;                                              // done
+    }
+
+    // ── Step 3: the AI failed, so use the best safety net we have ──
+    if (staleCache) {                                                  // an older cached meaning exists
+        return {                                                       // better than nothing, and we do NOT re-save it as "current"
+            meaning: staleCache.meaning,
+            partOfSpeech: staleCache.partOfSpeech || "",
+            exampleSentence: staleCache.exampleSentence,
+            synonyms: staleCache.synonyms,
+            source: staleCache.source
+        };
+    }
+    if (senses.length) {                                               // the dictionary worked, only the AI failed
+        return {                                                       // use the dictionary's first sense (the old behaviour); NOT cached, so next time we retry the AI
+            meaning: senses[0].definition,
+            partOfSpeech: senses[0].partOfSpeech || "",
+            exampleSentence: senses[0].example || "No example available",
+            synonyms: senses[0].synonyms || [],
+            source: "Free Dictionary API"
         };
     }
 
-    // ── Step 1: Free Dictionary API ──
-    // Wrapped in try/catch — dictionaryapi.dev can throw for a 404 (word not
-    // found), a timeout, or an outright outage (seen: Cloudflare 522). Any of
-    // those used to crash the whole addWord request with an uncaught error;
-    // now they just fall through to the Groq fallback below instead.
-    try {
-        const response = await axios.get(
-            `https://api.dictionaryapi.dev/api/v2/entries/en/${word}`,
-            { timeout: 5000 } // 5s is generous since this is a free, sometimes-slow public API
-        );
-        const data = response.data?.[0]; // the API returns an array; we only need the first entry
-        const definition = data?.meanings?.[0]?.definitions?.[0]?.definition;
-        if (definition) {
-            const result = {
-                meaning: definition,
-                exampleSentence: data?.meanings?.[0]?.definitions?.[0]?.example || "No example available",
-                synonyms: data?.meanings?.[0]?.definitions?.[0]?.synonyms || [],
-                source: "Free Dictionary API"
-            };
-            await cacheMeaning(word, result); // save so the next lookup of this word is instant
-            return result;
-        }
-    } catch (err) {
-        // Covers: word not found (404), API down, timeout, rate limit, etc.
-        console.log(`[Dictionary API] Failed for "${word}":`, err.response?.status || err.message);
-    }
-
-    // ── Step 2: last resort — ask Groq to write a definition ──
-    const groqMeaning = await generateMeaningWithGroq(word);
-    if (groqMeaning) {
-        await cacheMeaning(word, groqMeaning); // cache AI answers too, so we only ever pay for one Groq call per word
-        return groqMeaning;
-    }
-
-    // Only reached if the cache, RAG, the dictionary API, AND Groq all failed/found nothing —
-    // e.g. GROQ_API_KEY isn't set, dictionaryapi.dev AND Groq are both down at once, or the
-    // word genuinely isn't a real word. Deliberately NOT cached — we want to try again for
-    // this word next time instead of permanently remembering a "not found".
-    return {
+    // ── Step 4: nothing worked ──
+    return {                                                           // deliberately NOT cached, so we try again next time
         meaning: "No meaning found — try checking the spelling or add your own note.",
+        partOfSpeech: "",
         exampleSentence: "No example available",
         synonyms: [],
         source: "Not found"
@@ -154,7 +199,7 @@ const cacheMeaning = async (word, result) => {
         // requests for the same brand-new word land at almost the same time
         await WordCache.findOneAndUpdate(
             { word },
-            { word, ...result },
+            { word, ...result, meaningVersion: MEANING_VERSION }, // NEW: stamp the entry with the current recipe version so old entries are recognised as stale
             { upsert: true }
         );
     } catch (err) {
@@ -202,12 +247,13 @@ exports.addWord = async (req, res) => {
             });
         }
 
-        const { meaning, exampleSentence, synonyms } = await getMeaning(normalizedWord);
+        const { meaning, partOfSpeech, exampleSentence, synonyms } = await getMeaning(normalizedWord); // NEW: also take partOfSpeech from the lookup
 
         const newWord = await Word.create({
             userId,
             word: normalizedWord,
             meaning,
+            partOfSpeech, // NEW: noun / verb / adjective ... saved with the word
             exampleSentence,
             synonyms,
             status: "review"
@@ -260,9 +306,9 @@ exports.previewMeaning = async (req, res) => {
         }
 
         // reuse the exact same lookup chain addWord() uses — one source of truth
-        const { meaning, exampleSentence, synonyms, source } = await getMeaning(word);
+        const { meaning, partOfSpeech, exampleSentence, synonyms, source } = await getMeaning(word); // NEW: include partOfSpeech
 
-        res.status(200).json({ word, meaning, exampleSentence, synonyms, source });
+        res.status(200).json({ word, meaning, partOfSpeech, exampleSentence, synonyms, source }); // NEW: send partOfSpeech to the browser too
     } catch (error) {
         console.log("PREVIEW MEANING ERROR:", error.message);
         res.status(500).json({ message: "Failed to look up word" });
@@ -276,13 +322,13 @@ exports.previewMeaning = async (req, res) => {
  * reason why it's wrong. Falls back to null on any failure so the caller
  * can use the old same-vocab-list method instead.
  */
-const generateSimilarDecoys = async (word, correctMeaning) => {
+const generateSimilarDecoys = async (word, correctMeaning, partOfSpeech = "") => { // NEW: partOfSpeech (optional) lets wrong options match the right answer's type of word
     if (!process.env.GROQ_API_KEY) return null;
 
     const prompt = `You are building a vocabulary quiz. The word is "${word}" and its correct meaning is:
 "${correctMeaning}"
 
-Write 3 INCORRECT but PLAUSIBLE dictionary-style definitions for "${word}" — the kind of wrong answers that would actually trick someone who half-remembers the word. Match the length and tone of the correct meaning. Do not just negate the correct meaning; invent a different, believable concept.
+Write 3 INCORRECT but PLAUSIBLE dictionary-style definitions for "${word}" — the kind of wrong answers that would actually trick someone who half-remembers the word. Match the length and tone of the correct meaning.${partOfSpeech ? ` Every wrong option must also describe a ${partOfSpeech}, just like the correct meaning.` : ""} Do not just negate the correct meaning; invent a different, believable concept.
 
 For each wrong option, also give a short reason (max 16 words) explaining why it's wrong — ideally by naming what real word or concept that wrong meaning actually belongs to.
 
@@ -358,7 +404,7 @@ exports.getQuiz = async (req, res) => {
         const correctAnswer = correctWord.meaning;
 
         // ── Try AI-generated similar-meaning decoys first ──
-        const aiDecoys = await generateSimilarDecoys(correctWord.word, correctAnswer);
+        const aiDecoys = await generateSimilarDecoys(correctWord.word, correctAnswer, correctWord.partOfSpeech); // NEW: pass the part of speech along
 
         let options, reasons;
 
@@ -438,5 +484,39 @@ exports.updateNote = async (req, res) => {
         res.json(word);
     } catch (error) {
         res.status(500).json({ message: "Failed to update note" });
+    }
+};
+
+
+/**
+ * REGENERATE A MEANING — the "↻ Regenerate" button.
+ * Rebuilds the meaning of ONE of the user's saved words from scratch, ignoring the shared cache,
+ * then saves the new meaning on the user's word (and getMeaning refreshes the shared cache too).
+ */
+exports.regenerateMeaning = async (req, res) => {                      // runs when the browser calls PATCH /api/words/:id/regenerate
+    try {                                                              // try/catch so any crash becomes a clean error message
+        const saved = await Word.findOne({ _id: req.params.id, userId: req.user }); // find the word by id, but ONLY if it belongs to this user (data isolation)
+        if (!saved) {                                                  // no such word for this user
+            return res.status(404).json({ message: "Word not found" }); // 404 = not found
+        }
+
+        const fresh = await getMeaning(saved.word, { forceRefresh: true }); // rebuild the meaning, skipping the cache
+
+        if (!/AI/.test(fresh.source)) {                                // only accept results the AI helped write ("Dictionary + AI" or "AI Generated")
+            return res.status(502).json({                              // 502 = a service we depend on (the AI) didn't answer properly
+                message: "Couldn't regenerate the meaning right now — please try again in a moment."
+            });                                                        // the old meaning stays untouched
+        }
+
+        saved.meaning = fresh.meaning;                                 // replace the old meaning with the new one
+        saved.partOfSpeech = fresh.partOfSpeech;                       // update the part of speech too
+        saved.exampleSentence = fresh.exampleSentence;                 // update the example sentence
+        saved.synonyms = fresh.synonyms;                               // update the synonyms
+        await saved.save();                                            // write the changes to MongoDB
+
+        res.status(200).json(saved);                                   // send the updated word back to the browser
+    } catch (error) {                                                  // anything unexpected
+        console.log("REGENERATE MEANING ERROR:", error.message);       // log it for debugging
+        res.status(500).json({ message: "Failed to regenerate meaning" }); // 500 = server error
     }
 };
