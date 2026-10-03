@@ -23,7 +23,6 @@ const Quiz = lazy(() => import("./pages/Quiz"));
 const Vocabulary = lazy(() => import("./pages/Vocabulary"));
 const PDFReader = lazy(() => import("./pages/PDFReader"));
 const WordProfile = lazy(() => import("./pages/WordProfile"));
-const VoiceAssistant = lazy(() => import("./pages/VoiceAssistant"));
 const SpeakingPractice = lazy(() => import("./pages/SpeakingPractice"));
 
 function ProtectedRoute({ children }) {
