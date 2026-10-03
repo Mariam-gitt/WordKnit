@@ -520,3 +520,72 @@ exports.regenerateMeaning = async (req, res) => {                      // runs w
         res.status(500).json({ message: "Failed to regenerate meaning" }); // 500 = server error
     }
 };
+
+
+// LEARNED_AFTER = how many right answers IN A ROW turn a word into "learned".
+// Change this one number to make the rule easier (2) or stricter (5).
+const LEARNED_AFTER = 3;
+
+/**
+ * RECORD A REVIEW — saves the result of ONE quiz answer (or flashcard rating) on the word's scorecard.
+ * Browser sends: { mode: "quiz", selected: "<the option the user picked>" }
+ *            or: { mode: "flashcard", known: true | false }
+ * The SERVER decides if a quiz answer is correct (it compares with the saved meaning),
+ * so the saved results can't be faked by the browser.
+ */
+exports.recordReview = async (req, res) => {                           // runs when the browser calls POST /api/words/:id/review
+    try {                                                              // try/catch so any crash becomes a clean error message
+        const { mode, selected, known } = req.body;                    // pull the three possible fields out of the request body (the JSON the browser sent)
+
+        if (mode !== "quiz" && mode !== "flashcard") {                 // we only understand these two modes
+            return res.status(400).json({ message: "mode must be 'quiz' or 'flashcard'" }); // 400 = bad request
+        }
+
+        const word = await Word.findOne({ _id: req.params.id, userId: req.user }); // find the word by id, but ONLY if it belongs to this user (data isolation)
+        if (!word) {                                                   // no such word for this user
+            return res.status(404).json({ message: "Word not found" }); // 404 = not found
+        }
+
+        let correct;                                                   // will become true (right) or false (wrong)
+        if (mode === "quiz") {                                         // quiz: the browser tells us WHICH option was picked
+            if (typeof selected !== "string") {                        // the picked option must be text
+                return res.status(400).json({ message: "selected is required for quiz answers" });
+            }
+            correct = selected === word.meaning;                       // the server decides: right only if the pick equals the saved meaning
+        } else {                                                       // flashcard: the user honestly says whether they knew it
+            if (typeof known !== "boolean") {                          // must be exactly true or false
+                return res.status(400).json({ message: "known (true/false) is required for flashcards" });
+            }
+            correct = known;                                           // "I knew it" = right, "still learning" = wrong
+        }
+
+        const wasLearned = word.status === "learned";                  // remember the old status so we can tell the browser if it changed
+
+        word.lastReviewed = new Date();                                // stamp "practised just now"
+        if (correct) {                                                 // RIGHT answer
+            word.correctCount += 1;                                    // total right answers goes up
+            word.correctStreak += 1;                                   // right answers in a row goes up
+            if (word.correctStreak >= LEARNED_AFTER) {                 // enough in a row?
+                word.status = "learned";                               // the word is now learned
+            }
+        } else {                                                       // WRONG answer
+            word.wrongCount += 1;                                      // total wrong answers goes up
+            word.correctStreak = 0;                                    // the streak starts again from zero
+            word.status = "review";                                    // back to "review" (even if the user had marked it learned by hand)
+        }
+        await word.save();                                             // write the updated scorecard to MongoDB
+
+        res.status(200).json({                                         // tell the browser what happened (server → browser)
+            correct,                                                   // was it right?
+            status: word.status,                                       // "learned" or "review"
+            correctStreak: word.correctStreak,                         // right answers in a row now
+            correctCount: word.correctCount,                           // total right answers
+            wrongCount: word.wrongCount,                               // total wrong answers
+            becameLearned: !wasLearned && word.status === "learned",   // true only if this answer just made it learned
+            backToReview: wasLearned && word.status === "review"       // true only if this answer just sent it back to review
+        });
+    } catch (error) {                                                  // anything unexpected
+        console.log("RECORD REVIEW ERROR:", error.message);            // log it for debugging
+        res.status(500).json({ message: "Failed to record review" });  // 500 = server error
+    }
+};
