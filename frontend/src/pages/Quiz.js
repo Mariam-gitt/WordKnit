@@ -10,15 +10,25 @@ function Quiz() {
     const [selected, setSelected] = useState(null);
     const [error, setError]       = useState("");
     const [streak, setStreak]     = useState(0);
+    const [askedIds, setAskedIds]           = useState([]);    // NEW: ids of words already asked this round (starts empty)
+    const [roundComplete, setRoundComplete] = useState(false); // NEW: true once every word has been asked
 
-    useEffect(() => { loadQuiz(); }, []);
+    useEffect(() => { loadQuiz([]); }, []);                        // NEW: first load sends an empty list because nothing has been asked yet
 
-    const loadQuiz = async () => {
-        try {
-            setError(""); setQuiz(null); setAnswered(false); setSelected(null);
-            const res = await api.get("/words/quiz");
-            setQuiz(res.data);
-            setTotal(t => t + 1);
+    const loadQuiz = async (excludeIds) => {                       // NEW: excludeIds = already-asked word ids, passed in by whoever calls us
+        try {                                                      // try/catch so a failed request shows a message instead of breaking the page
+            setError(""); setQuiz(null); setAnswered(false); setSelected(null); // reset the screen for the next question
+            const res = await api.get("/words/quiz", {             // browser → server: ask for the next question
+                params: { exclude: excludeIds.join(",") }          // NEW: params = what goes after "?" in the URL, so [a,b] becomes /words/quiz?exclude=a,b
+            });
+            if (res.data.roundComplete) {                          // NEW: server → browser: "no words left to ask"
+                setRoundComplete(true);                            // NEW: switch to the "round finished" screen
+                setTotal(t => t + 1);                              // NEW: keeps the existing "total - 1" accuracy maths right on the final screen
+                return;                                            // NEW: stop here, there is no question to show
+            }
+            setQuiz(res.data);                                     // show the question
+            setAskedIds(prev => [...prev, res.data.wordId]);       // NEW: add this word to the asked list ([...prev, x] = copy of the old list plus one new item)
+            setTotal(t => t + 1);                                  // count the question
         } catch (err) {
             setError(err.response?.data?.message || "Not enough words yet — add at least 4 words to start quizzing.");
         }
@@ -79,15 +89,36 @@ function Quiz() {
                             <div className="empty-state">
                                 <div className="emoji">◈</div>
                                 <p style={{ marginBottom: "16px" }}>{error}</p>
-                                <button className="btn btn-ghost" onClick={loadQuiz} style={{ width: "auto" }}>
+                                <button className="btn btn-ghost" onClick={() => loadQuiz(askedIds)} style={{ width: "auto" }}>
                                     Try again
                                 </button>
                             </div>
                         </div>
                     )}
 
+                    {/* NEW: Round complete — shown when every word has been asked once */}
+                    {roundComplete && (
+                        <div className="empty-state" style={{ textAlign: "center" }}>
+                            <div className="emoji">🎉</div>
+                            <p style={{ marginBottom: "16px" }}>
+                                You went through all {askedIds.length} of your words! You got {score} right.
+                            </p>
+                            <button
+                                className="btn btn-primary"
+                                style={{ width: "auto" }}
+                                onClick={() => {                   // runs when "Start again" is clicked
+                                    setAskedIds([]);               // clear the asked list = brand new round
+                                    setRoundComplete(false);       // hide this screen
+                                    setScore(0); setTotal(0); setStreak(0); // fresh score for the new round
+                                    loadQuiz([]);                  // fetch the first question with an empty asked list
+                                }}>
+                                Start again
+                            </button>
+                        </div>
+                    )}
+
                     {/* Loading */}
-                    {!error && !quiz && (
+                    {!error && !quiz && !roundComplete && (
                         <div style={{ textAlign: "center", padding: "50px" }}>
                             <div className="loading-dots"><span/><span/><span/></div>
                         </div>
@@ -169,7 +200,7 @@ function Quiz() {
                                     </div>
                                     <button
                                         className="btn btn-primary"
-                                        onClick={loadQuiz}
+                                        onClick={() => loadQuiz(askedIds)}
                                         style={{ width: "auto", flexShrink: 0 }}
                                     >
                                         Next →
