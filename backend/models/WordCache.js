@@ -25,6 +25,19 @@ const wordCacheSchema = new mongoose.Schema({
         required: true
     },
 
+    // NEW: noun / verb / adjective ... for the sense this meaning describes
+    partOfSpeech: {
+        type: String,
+        default: ""
+    },
+
+    // NEW: which version of our meaning-writing recipe made this entry.
+    // Entries with an older (or missing) number are treated as out-of-date and rebuilt by getMeaning().
+    meaningVersion: {
+        type: Number,
+        default: 1
+    },
+
     // an example sentence using the word, if the source provided one
     exampleSentence: {
         type: String,

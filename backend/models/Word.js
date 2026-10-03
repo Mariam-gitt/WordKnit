@@ -20,6 +20,12 @@ const wordSchema = new mongoose.Schema({
 
     meaning: String,
 
+    // NEW: noun / verb / adjective ... — the type of word this meaning is for
+    partOfSpeech: {
+        type: String,
+        default: ""
+    },
+
     exampleSentence: String,
 
     synonyms: [String],
