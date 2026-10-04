@@ -3226,15 +3226,12 @@ input:focus {
 
 /* 9. The WordKnit name shown inside the page area (when the sidebar is hidden, or on the Dashboard) */
 .app-main-brand {
+  width: 100%;
   display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 10px;
-  padding: 16px 44px 0;
-  font-family: var(--heading);
-  font-weight: 700;
-  font-size: 1.05rem;
-  color: var(--ink);
-  flex-shrink: 0;
+  gap: 8px;
+  margin: 0 auto 24px;
 }
 
 /* 10. Dashboard: compact page + one action row + pop-ups */
