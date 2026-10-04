@@ -1,49 +1,41 @@
-import { useState } from "react"; // useState: local component state (the typed word, loading flag, error text)
-import api from "../api"; // shared axios instance (auto-attaches the auth token to every request)
+import { useState } from "react"; // local state: the typed word, loading flag, error text
+import api from "../api"; // shared axios instance (adds the login token to every request automatically)
+import { Button } from "./ui"; // the shared button
 
+// A single-line "add a word" field with its button inside. onWordAdded is a callback from the parent:
+// this child calls it with the new word so the parent can refresh its list (child → parent).
 function AddWord({ onWordAdded }) {
-    const [word, setWord] = useState("");       // the text currently typed into the input box
-    const [loading, setLoading] = useState(false); // true while the "Add" request is in flight
-    const [error, setError] = useState("");      // inline message shown under the box (replaces the old alert() popup)
+    const [word, setWord] = useState("");           // text currently typed in the box
+    const [loading, setLoading] = useState(false);  // true while the request is in flight
+    const [error, setError] = useState("");         // message shown under the box
 
     const handleSubmit = async () => {
-        if (!word.trim()) return; // nothing typed — do nothing, no need to show an error for an empty submit
-        setLoading(true);
-        setError(""); // clear any previous message before trying again
+        if (!word.trim()) return; // nothing typed: do nothing
+        setLoading(true); setError(""); // start loading and clear an old message
         try {
-            await api.post("/words", { word: word.trim() });
-            const added = word.trim().toLowerCase(); // normalize the same way the backend does, for the callback below
-            setWord(""); // clear the input now that the word was saved successfully
-            onWordAdded(added); // tell the parent (Dashboard) so it can refresh the list + show the profile preview
+            await api.post("/words", { word: word.trim() }); // save the word
+            const added = word.trim().toLowerCase(); // same normalisation the backend uses
+            setWord(""); // clear the box
+            onWordAdded(added); // tell the parent (child → parent)
         } catch (err) {
-            if (err.response?.status === 409) {
-                // 409 Conflict = the backend's dedicated "you already have this word" response
-                // (see wordController.js addWord) — show its friendly message instead of a generic failure.
-                setError(err.response.data?.message || "That word is already in your list.");
-            } else {
-                // Any other failure (network issue, server error, etc.) — fall back to whatever
-                // message the server sent, or a generic one if it sent nothing usable.
-                setError(err.response?.data?.message || "Failed to add word. Please try again.");
-            }
+            // 409 = "you already have this word"; anything else gets the server's message or a generic one
+            setError(err.response?.data?.message || (err.response?.status === 409 ? "That word is already in your list." : "Failed to add word. Please try again."));
         } finally { setLoading(false); }
     };
 
     return (
-        // Wrapping div lets the inline error message sit directly under the input+button row
-        // without disturbing the existing .add-word-box layout used elsewhere (Dashboard stats etc).
-        <div className="add-word-wrap">
-            <div className="add-word-box">
+        <div className="add-wrap">
+            <div className="add-box">
                 <input
                     value={word}
-                    onChange={e => { setWord(e.target.value); if (error) setError(""); }} // typing again clears a stale error
-                    placeholder="Add a new word..."
-                    onKeyDown={e => e.key === "Enter" && handleSubmit()}
+                    onChange={(e) => { setWord(e.target.value); if (error) setError(""); }} // typing again clears an old error
+                    onKeyDown={(e) => e.key === "Enter" && handleSubmit()} // Enter adds the word
+                    placeholder="Add a new word"
+                    aria-label="New word"
                 />
-                <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
-                    {loading ? "Adding..." : "+ Add"}
-                </button>
+                <Button variant="primary" onClick={handleSubmit} disabled={loading}>{loading ? "Adding…" : "Add"}</Button>
             </div>
-            {error && <p className="add-word-error">{error}</p>}
+            {error && <p className="form-error add-error">{error}</p>}
         </div>
     );
 }

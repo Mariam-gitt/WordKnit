@@ -1,196 +1,138 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import api from "../api";
+import { useState } from "react"; // local state for filters, search, notes and busy flags
+import { useNavigate } from "react-router-dom"; // opens a word's profile page
+import { TbRefresh, TbTrash } from "react-icons/tb"; // regenerate and delete icons
+import api from "../api"; // shared axios instance
+import { Button, IconButton, Chip, Tabs, EmptyState } from "./ui"; // shared UI kit
 
+// The searchable, filterable list on the My Words page.
+// words and onStatusChange come from the parent (Vocabulary page): parent → child data,
+// and onStatusChange is called to ask the parent to re-fetch after any change (child → parent).
 function WordList({ words, onStatusChange }) {
     const navigate = useNavigate();
-    const [filter, setFilter] = useState("all");
-    const [search, setSearch] = useState("");
-    const [updating, setUpdating] = useState(null);
-    const [deleting, setDeleting] = useState(null);
-    const [editingNote, setEditingNote] = useState(null);   // word._id being edited
-    const [noteText, setNoteText] = useState("");           // draft note value
-    const [savingNote, setSavingNote] = useState(null);
-    const [regenerating, setRegenerating] = useState(null); // NEW: _id of the word whose meaning is being rebuilt (null = none), used to show "…" on its button
+    const [filter, setFilter] = useState("all");           // "all" | "review" | "learned"
+    const [search, setSearch] = useState("");              // text typed in the search box
+    const [updating, setUpdating] = useState(null);        // id of the word whose status is being changed
+    const [deleting, setDeleting] = useState(null);        // id of the word being deleted
+    const [regenerating, setRegenerating] = useState(null);// id of the word whose meaning is being rebuilt
+    const [editingNote, setEditingNote] = useState(null);  // id of the word whose note is being edited
+    const [noteText, setNoteText] = useState("");          // draft note text
+    const [savingNote, setSavingNote] = useState(null);    // id of the word whose note is being saved
+
+    const refresh = () => { if (onStatusChange) onStatusChange(); }; // ask the parent to re-fetch the list
 
     const toggleStatus = async (word) => {
-        const newStatus = word.status === "learned" ? "review" : "learned";
+        const newStatus = word.status === "learned" ? "review" : "learned"; // flip learned <-> review
         setUpdating(word._id);
-        try {
-            await api.patch(`/words/${word._id}/status`, { status: newStatus });
-            if (onStatusChange) onStatusChange();
-        } catch (err) { console.log(err); }
+        try { await api.patch(`/words/${word._id}/status`, { status: newStatus }); refresh(); }
+        catch (err) { console.log(err); }
         finally { setUpdating(null); }
     };
 
-    const regenerateMeaning = async (word) => {                         // NEW: runs when "↻ Regenerate" is clicked; word = the saved word object from the list
-        if (!window.confirm(`Regenerate the meaning of "${word.word}"? The current meaning will be replaced.`)) return; // ask first, because the old meaning is overwritten
-        setRegenerating(word._id);                                      // remember which word is busy so its button shows "…"
-        try {                                                           // try/catch so a failed request shows a message instead of breaking the page
-            await api.patch(`/words/${word._id}/regenerate`);           // browser → server: "rebuild this word's meaning"
-            if (onStatusChange) onStatusChange();                       // child → parent: tell Vocabulary.js to re-fetch the list so the new meaning shows up
-        } catch (err) {                                                 // the server said no (AI busy, word missing, ...)
-            alert(err.response?.data?.message || "Failed to regenerate the meaning."); // show the server's message, or a default one
-        } finally {                                                     // runs whether it worked or failed
-            setRegenerating(null);                                      // stop showing the busy "…" state
-        }
+    const regenerateMeaning = async (word) => {
+        if (!window.confirm(`Regenerate the meaning of "${word.word}"? The current meaning will be replaced.`)) return;
+        setRegenerating(word._id);
+        try { await api.patch(`/words/${word._id}/regenerate`); refresh(); }
+        catch (err) { alert(err.response?.data?.message || "Failed to regenerate the meaning."); }
+        finally { setRegenerating(null); }
     };
 
-    const handleDelete = async (e, word) => {
-        e.stopPropagation();
+    const handleDelete = async (word) => {
         if (!window.confirm(`Remove "${word.word}" from your vocabulary?`)) return;
         setDeleting(word._id);
-        try {
-            await api.delete(`/words/${word._id}`);
-            if (onStatusChange) onStatusChange();
-        } catch {
-            alert("Failed to delete word.");
-        }
+        try { await api.delete(`/words/${word._id}`); refresh(); }
+        catch { alert("Failed to delete word."); }
         finally { setDeleting(null); }
     };
 
-    const startEditNote = (e, word) => {
-        e.stopPropagation();
-        setEditingNote(word._id);
-        setNoteText(word.note || "");
-    };
-
+    const startEditNote = (word) => { setEditingNote(word._id); setNoteText(word.note || ""); };
+    const cancelNote = () => { setEditingNote(null); setNoteText(""); };
     const saveNote = async (wordId) => {
         setSavingNote(wordId);
-        try {
-            await api.patch(`/words/${wordId}/note`, { note: noteText });
-            if (onStatusChange) onStatusChange();
-            setEditingNote(null);
-        } catch {
-            alert("Failed to save note.");
-        } finally {
-            setSavingNote(null);
-        }
+        try { await api.patch(`/words/${wordId}/note`, { note: noteText }); refresh(); setEditingNote(null); }
+        catch { alert("Failed to save note."); }
+        finally { setSavingNote(null); }
     };
 
-    const cancelNote = () => {
-        setEditingNote(null);
-        setNoteText("");
-    };
-
+    const q = search.toLowerCase(); // lower-case search text so matching ignores capitals
     const filtered = words
-        .filter(w => filter === "all" || w.status === filter)
-        .filter(w =>
-            w.word.toLowerCase().includes(search.toLowerCase()) ||
-            w.meaning?.toLowerCase().includes(search.toLowerCase())
-        );
+        .filter((w) => filter === "all" || w.status === filter)
+        .filter((w) => w.word.toLowerCase().includes(q) || w.meaning?.toLowerCase().includes(q));
 
-    const learnedCount = words.filter(w => w.status === "learned").length;
-    const reviewCount = words.filter(w => w.status !== "learned").length;
+    const learnedCount = words.filter((w) => w.status === "learned").length;
+    const reviewCount = words.length - learnedCount;
 
     return (
         <div>
             <input
-                className="search-input"
-                placeholder="Search words or meanings…"
+                className="search"
+                placeholder="Search words or meanings"
+                aria-label="Search words"
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={(e) => setSearch(e.target.value)}
             />
 
-            <div className="filter-tabs">
-                <button className={`filter-tab ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>
-                    All ({words.length})
-                </button>
-                <button className={`filter-tab ${filter === "review" ? "active" : ""}`} onClick={() => setFilter("review")}>
-                    Review ({reviewCount})
-                </button>
-                <button className={`filter-tab ${filter === "learned" ? "active" : ""}`} onClick={() => setFilter("learned")}>
-                    Learned ({learnedCount})
-                </button>
-            </div>
+            <Tabs
+                value={filter}
+                onChange={setFilter}
+                items={[
+                    { value: "all", label: "All", count: words.length },
+                    { value: "review", label: "Review", count: reviewCount },
+                    { value: "learned", label: "Learned", count: learnedCount },
+                ]}
+            />
 
-            {filtered.length === 0 ? (
-                <div className="empty-state">
-                    <div className="emoji">{search ? "?" : "+"}</div>
-                    <p>{search ? `No words matching "${search}"` : "No words here yet."}</p>
-                </div>
-            ) : (
-                <div className="word-list">
-                    {filtered.map(w => (
-                        <div key={w._id} className={`word-card ${w.status === "learned" ? "learned" : ""}`}>
-                            <div className="word-card-top">
-                                <h3 className="word-card-word-link" onClick={() => navigate(`/profile/${w.word}`)}>
-                                    {w.word} {/* plain word: the arrow was removed for a cleaner look (click still opens the word profile) */}
-                                </h3>
-                                <div className="word-card-actions">
-                                    <button
-                                        className={`status-btn ${w.status === "learned" ? "learned" : "review"}`}
-                                        onClick={() => toggleStatus(w)}
-                                        disabled={updating === w._id}
-                                    >
-                                        {updating === w._id ? "…" : w.status === "learned" ? "✓ Learned" : "Review"}
-                                    </button>
-                                    <button
-                                        className="btn-icon-delete"
-                                        onClick={(e) => handleDelete(e, w)}
-                                        disabled={deleting === w._id}
-                                        title="Delete word"
-                                    >
-                                        {deleting === w._id ? "…" : "✕"}
-                                    </button>
+            <div className="word-stack">
+                {filtered.length === 0 ? (
+                    <EmptyState>{search ? `No words matching "${search}"` : "No words here yet."}</EmptyState>
+                ) : filtered.map((w) => (
+                    <article key={w._id} className="word-row">
+                        <div className="word-row-head">
+                            <h3 className="word-title" onClick={() => navigate(`/profile/${encodeURIComponent(w.word)}`)}>{w.word}</h3>
+                            {w.partOfSpeech && <span className="word-pos">{w.partOfSpeech}</span>}
+                            <span className="grow" />
+                            <Chip tone={w.status === "learned" ? "learned" : "default"} onClick={() => toggleStatus(w)} disabled={updating === w._id}>
+                                {updating === w._id ? "…" : w.status === "learned" ? "✓ Learned" : "Review"}
+                            </Chip>
+                            <IconButton label="Regenerate meaning" onClick={() => regenerateMeaning(w)} disabled={regenerating === w._id}>
+                                <TbRefresh size={17} />
+                            </IconButton>
+                            <IconButton label="Delete word" onClick={() => handleDelete(w)} disabled={deleting === w._id}>
+                                <TbTrash size={17} />
+                            </IconButton>
+                        </div>
+
+                        <p className="word-meaning">{w.meaning}</p>
+                        {w.exampleSentence && w.exampleSentence !== "No example available" && (
+                            <p className="word-example">"{w.exampleSentence}"</p>
+                        )}
+
+                        {editingNote === w._id ? (
+                            <div className="note-editor">
+                                <textarea
+                                    value={noteText}
+                                    onChange={(e) => setNoteText(e.target.value)}
+                                    placeholder="Add your personal note about this word…"
+                                    maxLength={500}
+                                    autoFocus
+                                    rows={3}
+                                />
+                                <div className="note-actions">
+                                    <span className="note">{noteText.length}/500</span>
+                                    <span className="grow" />
+                                    <Button size="sm" variant="ghost" onClick={cancelNote}>Cancel</Button>
+                                    <Button size="sm" variant="primary" onClick={() => saveNote(w._id)} disabled={savingNote === w._id}>
+                                        {savingNote === w._id ? "Saving…" : "Save"}
+                                    </Button>
                                 </div>
                             </div>
-                            <p className="meaning">{w.partOfSpeech && <em>({w.partOfSpeech}) </em>}{w.meaning}</p> {/* NEW: shows "(noun)" etc. in italics before the meaning when we have it */}
-                            {w.exampleSentence && w.exampleSentence !== "No example available" && (
-                                <p className="example">"{w.exampleSentence}"</p>
-                            )}
-
-                            {/* NEW: Regenerate button — rebuilds this word's meaning */}
-                            <button
-                                className="word-note-add"
-                                onClick={() => regenerateMeaning(w)}
-                                disabled={regenerating === w._id}
-                                title="Rebuild this meaning from the dictionary + AI"
-                            >
-                                {regenerating === w._id ? "Regenerating…" : "↻ Regenerate meaning"}
-                            </button>
-
-                            {/* Note section */}
-                            {editingNote === w._id ? (
-                                <div className="word-note-editor">
-                                    <textarea
-                                        className="word-note-textarea"
-                                        value={noteText}
-                                        onChange={e => setNoteText(e.target.value)}
-                                        placeholder="Add your personal note about this word…"
-                                        maxLength={500}
-                                        autoFocus
-                                        rows={3}
-                                    />
-                                    <div className="word-note-actions">
-                                        <span className="word-note-count">{noteText.length}/500</span>
-                                        <button className="word-note-btn save"
-                                            onClick={() => saveNote(w._id)}
-                                            disabled={savingNote === w._id}>
-                                            {savingNote === w._id ? "Saving…" : "Save"}
-                                        </button>
-                                        <button className="word-note-btn cancel" onClick={cancelNote}>
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="word-note-row">
-                                    {w.note ? (
-                                        <p className="word-note-text" onClick={(e) => startEditNote(e, w)}>
-                                            📝 {w.note}
-                                        </p>
-                                    ) : (
-                                        <button className="word-note-add" onClick={(e) => startEditNote(e, w)}>
-                                            + Add note
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            )}
+                        ) : w.note ? (
+                            <p className="word-note" onClick={() => startEditNote(w)}>{w.note}</p>
+                        ) : (
+                            <button className="link-btn" onClick={() => startEditNote(w)}>+ Add note</button>
+                        )}
+                    </article>
+                ))}
+            </div>
         </div>
     );
 }
