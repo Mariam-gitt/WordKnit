@@ -1,56 +1,38 @@
-import { useEffect, useState } from "react";
-import api from "../api";
-import AppLayout from "../components/AppLayout";
-import WordList from "../components/WordList";
+import { useEffect, useState } from "react"; // state for the word list and loading flag
+import api from "../api"; // shared axios instance
+import AppLayout from "../components/AppLayout"; // the page frame
+import WordList from "../components/WordList"; // the searchable list
+import { PageHeader, Stat } from "../components/ui"; // shared UI kit
 
+// The "My Words" page: three numbers on top, then the searchable, filterable list.
 function Vocabulary() {
-    const [words, setWords] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [words, setWords] = useState([]);       // every saved word
+    const [loading, setLoading] = useState(true); // true until the first load finishes
 
     const fetchWords = async () => {
-        try {
-            const res = await api.get("/words");
-            setWords(res.data);
-        } catch (err) { console.log(err); }
+        try { const res = await api.get("/words"); setWords(res.data); }
+        catch (err) { console.log(err); }
         finally { setLoading(false); }
     };
+    useEffect(() => { fetchWords(); }, []); // load once when the page opens
 
-    useEffect(() => { fetchWords(); }, []);
-
-    const learnedCount = words.filter(w => w.status === "learned").length;
-    const reviewCount = words.length - learnedCount;
+    const learnedCount = words.filter((w) => w.status === "learned").length;
 
     return (
         <AppLayout statusCount={words.length}>
-                <div className="page-container">
-                    <div className="page-header">
-                        <h1>My Words</h1>
-                        <p>Search, filter and manage your vocabulary collection.</p>
-                    </div>
+            <div className="page">
+                <PageHeader title="My Words" subtitle="Search, filter and manage your vocabulary collection." />
 
-                    <div className="stats-row" style={{ marginBottom: "20px" }}>
-                        <div className="stat-card">
-                            <div className="stat-number">{words.length}</div>
-                            <div className="stat-label">Total</div>
-                        </div>
-                        <div className="stat-card">
-                            <div className="stat-number" style={{ color: "#1b5e20" }}>{learnedCount}</div>
-                            <div className="stat-label">Learned</div>
-                        </div>
-                        <div className="stat-card">
-                            <div className="stat-number" style={{ color: "var(--red)" }}>{reviewCount}</div>
-                            <div className="stat-label">To Review</div>
-                        </div>
-                    </div>
-
-                    {loading ? (
-                        <div style={{ textAlign: "center", padding: "40px" }}>
-                            <div className="loading-dots"><span/><span/><span/></div>
-                        </div>
-                    ) : (
-                        <WordList words={words} onStatusChange={fetchWords} />
-                    )}
+                <div className="stats">
+                    <Stat label="Total words" value={words.length} />
+                    <Stat label="Learned" value={learnedCount} tone="green" />
+                    <Stat label="To review" value={words.length - learnedCount} />
                 </div>
+
+                <div className="stack-gap">
+                    {loading ? <div className="loading"><span /><span /><span /></div> : <WordList words={words} onStatusChange={fetchWords} />}
+                </div>
+            </div>
         </AppLayout>
     );
 }

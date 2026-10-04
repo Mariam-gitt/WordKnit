@@ -2,6 +2,8 @@
 import { useState, useRef, useEffect } from "react";
 import api from "../api"; // shared axios instance (attaches the login token automatically)
 import AppLayout from "../components/AppLayout";
+import { TbMicrophone, TbPlayerStop, TbSettings, TbHistory, TbTrash } from "react-icons/tb"; // icons for the mic, settings and history
+import { PageHeader, Button, IconButton, Modal, Switch, Popover, Chip } from "../components/ui"; // shared UI kit (Radix-based pop-ups)
 
 // The phrase that starts your turn hands-free, without tapping "Tap to Talk".
 const WAKE_WORD = "wordknit";
@@ -128,12 +130,14 @@ function SpeakingPractice() {
             const chosen = voicesRef.current.find((v) => v.voiceURI === settingsRef.current.voiceURI);
             if (chosen) utterance.voice = chosen;
         }
+        if (!("speechSynthesis" in window)) return; // no text-to-speech in this browser: nothing to play
         window.speechSynthesis.cancel(); // don't let two local replies overlap
         window.speechSynthesis.speak(utterance);
     };
 
     // ── Load the browser's available text-to-speech voices, for the Settings panel ──
     useEffect(() => {
+        if (!("speechSynthesis" in window)) return; // some browsers have no text-to-speech: skip instead of crashing the page
         const loadVoices = () => {
             const voices = window.speechSynthesis.getVoices();
             voicesRef.current = voices;
@@ -451,467 +455,182 @@ function SpeakingPractice() {
 
     const micSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
 
+    return (
+        <AppLayout>
+            <div className="page page--narrow speak">
+                <PageHeader
+                    title="Speaking practice"
+                    subtitle={`Talk with an AI coach. It replies out loud, models good grammar, and works your saved words into the chat.${settings.wakeWordEnabled ? ' Say "WordKnit" any time to start talking.' : ""}`}
+                />
 
+                {!micSupported && <p className="form-error">Your browser doesn't support audio recording. Try Chrome or Edge.</p>}
 
-return (
-    <AppLayout>
-        <main className="speaking-page">
-            {/* ── PAGE HEADER ── */}
-            <header className="speaking-header">
-                <div className="speaking-brand">WORDKNIT</div>
-
-                <div className="speaking-header-line" />
-
-                <div className="speaking-heading-row">
-                    <div>
-                        <h1>Speaking Practice</h1>
-                        <p>
-                            Speak naturally. Your coach will listen, respond,
-                            and help you improve.
-                        </p>
-                    </div>
-
-                    <div className="speaking-header-actions">
-                        <button
-                            className="speaking-icon-btn"
-                            onClick={() => setShowSettings((v) => !v)}
-                            aria-label="Speaking settings"
-                            title="Settings"
-                        >
-                            ⚙
-                        </button>
-
-                        <button
-                            className="speaking-icon-btn"
-                            onClick={toggleHistory}
-                            aria-label="Speaking history"
-                            title="History"
-                        >
-                            ↺
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            {/* ── SETTINGS ── */}
-            {showSettings && (
-                <div className="speaking-overlay-panel">
-                    <div className="speaking-panel-heading">
-                        <div>
-                            <h3>Speaking settings</h3>
-                            <span>Personalize your practice</span>
-                        </div>
-
-                        <button
-                            className="speaking-close-btn"
-                            onClick={() => setShowSettings(false)}
-                        >
-                            ×
-                        </button>
-                    </div>
-
-                    <label className="speaking-field">
-                        <span>Speaking level</span>
-
-                        <select
-                            value={levelLoaded ? level : ""}
-                            onChange={(e) => changeLevel(e.target.value)}
-                            disabled={!levelLoaded}
-                        >
-                            {!levelLoaded && (
-                                <option value="">Loading…</option>
-                            )}
-
-                            {LEVEL_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                </option>
-                            ))}
-                        </select>
-
-                        <small>
-                            Changes take effect on your next conversation.
-                        </small>
-                    </label>
-
-                    <label className="speaking-checkbox">
-                        <input
-                            type="checkbox"
-                            checked={settings.wakeWordEnabled}
-                            onChange={(e) =>
-                                setSettings((s) => ({
-                                    ...s,
-                                    wakeWordEnabled: e.target.checked
-                                }))
-                            }
-                        />
-
-                        <span>
-                            Listen for “WordKnit” to start hands-free.
+                {micSupported && (
+                    <div className="speak-bar">
+                        {/* Status chip: tells you what the coach is doing right now */}
+                        <span className={`speak-status${isRecording ? " is-listening" : ""}`}>
+                            <span className="speak-dot" />
+                            {isProcessing ? "Thinking" : isRecording ? "Listening" : hasStarted ? "Ready" : "Not started"}
                         </span>
-                    </label>
+                        <span className="grow" />
+                        <IconButton label="History" onClick={toggleHistory}><TbHistory size={19} /></IconButton>
 
-                    <label className="speaking-field">
-                        <span>
-                            Local voice speed: {settings.rate.toFixed(2)}x
-                        </span>
-
-                        <input
-                            type="range"
-                            min="0.5"
-                            max="1.5"
-                            step="0.05"
-                            value={settings.rate}
-                            onChange={(e) =>
-                                setSettings((s) => ({
-                                    ...s,
-                                    rate: parseFloat(e.target.value)
-                                }))
-                            }
-                        />
-                    </label>
-
-                    <label className="speaking-field">
-                        <span>Local voice</span>
-
-                        <select
-                            value={settings.voiceURI || ""}
-                            onChange={(e) =>
-                                setSettings((s) => ({
-                                    ...s,
-                                    voiceURI: e.target.value || null
-                                }))
-                            }
+                        {/* Settings: a floating panel (Radix Popover) with a real on/off Switch */}
+                        <Popover
+                            trigger={<IconButton label="Settings"><TbSettings size={19} /></IconButton>}
                         >
-                            <option value="">Browser default</option>
-
-                            {availableVoices.map((v) => (
-                                <option key={v.voiceURI} value={v.voiceURI}>
-                                    {v.name} ({v.lang})
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-
-                    <label className="speaking-field">
-                        <span>Recognition language</span>
-
-                        <select
-                            value={settings.recogLang}
-                            onChange={(e) =>
-                                setSettings((s) => ({
-                                    ...s,
-                                    recogLang: e.target.value
-                                }))
-                            }
-                        >
-                            <option value="en-US">English (US)</option>
-                            <option value="en-GB">English (UK)</option>
-                            <option value="ur-PK">Urdu (Pakistan)</option>
-                            <option value="es-ES">Spanish</option>
-                            <option value="fr-FR">French</option>
-                            <option value="de-DE">German</option>
-                        </select>
-                    </label>
-                </div>
-            )}
-
-            {/* ── HISTORY ── */}
-            {showHistory && (
-                <div className="speaking-overlay-panel speaking-history-panel">
-                    <div className="speaking-panel-heading">
-                        <div>
-                            <h3>Past conversations</h3>
-                            <span>Your previous speaking sessions</span>
-                        </div>
-
-                        <button
-                            className="speaking-close-btn"
-                            onClick={() => setShowHistory(false)}
-                        >
-                            ×
-                        </button>
-                    </div>
-
-                    {sessions.length > 0 && (
-                        <button
-                            className="speaking-text-btn"
-                            onClick={clearAllSessions}
-                        >
-                            Clear all
-                        </button>
-                    )}
-
-                    {isLoadingSessions && (
-                        <p className="speaking-muted">Loading…</p>
-                    )}
-
-                    {!isLoadingSessions && sessions.length === 0 && (
-                        <p className="speaking-muted">
-                            No past conversations yet.
-                        </p>
-                    )}
-
-                    {!isLoadingSessions &&
-                        sessions.map((s) => (
-                            <div
-                                className="speaking-history-item"
-                                key={s.id}
-                            >
-                                <div
-                                    className="speaking-history-content"
-                                    onClick={() => viewSessionDetail(s.id)}
-                                >
-                                    <small>
-                                        {new Date(
-                                            s.startedAt
-                                        ).toLocaleString()}
-                                        {" · "}
-                                        {s.messageCount} messages
-                                        {" · "}
-                                        {s.level}
-                                    </small>
-
-                                    <p>{s.preview}…</p>
+                            <div className="speak-settings">
+                                <div className="field">
+                                    <label htmlFor="level">Speaking level</label>
+                                    <select id="level" value={levelLoaded ? level : ""} onChange={(e) => changeLevel(e.target.value)} disabled={!levelLoaded}>
+                                        {!levelLoaded && <option value="">Loading…</option>}
+                                        {LEVEL_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                    </select>
+                                    <p className="note">Applies from your next conversation.</p>
                                 </div>
-
-                                <button
-                                    className="speaking-delete-btn"
-                                    onClick={() => deleteOneSession(s.id)}
-                                >
-                                    Delete
-                                </button>
-
-                                {openSessionDetail?.id === s.id && (
-                                    <div className="speaking-history-detail">
-                                        {openSessionDetail.transcript.map(
-                                            (turn, i) => (
-                                                <p key={i}>
-                                                    <strong>
-                                                        {turn.role === "user"
-                                                            ? "You"
-                                                            : "Coach"}
-                                                        :
-                                                    </strong>{" "}
-                                                    {turn.content}
-                                                </p>
-                                            )
-                                        )}
-
-                                        {openSessionDetail.reflection && (
-                                            <p>
-                                                <strong>Feedback:</strong>{" "}
-                                                {
-                                                    openSessionDetail.reflection
-                                                }
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
+                                <Switch
+                                    label='Listen for "WordKnit" to start each turn'
+                                    checked={settings.wakeWordEnabled}
+                                    onChange={(checked) => setSettings((s) => ({ ...s, wakeWordEnabled: checked }))}
+                                />
+                                <div className="field">
+                                    <label htmlFor="rate">Local voice speed: {settings.rate.toFixed(2)}x</label>
+                                    <input id="rate" type="range" min="0.5" max="1.5" step="0.05" value={settings.rate}
+                                        onChange={(e) => setSettings((s) => ({ ...s, rate: parseFloat(e.target.value) }))} />
+                                </div>
+                                <div className="field">
+                                    <label htmlFor="voice">Local voice</label>
+                                    <select id="voice" value={settings.voiceURI || ""} onChange={(e) => setSettings((s) => ({ ...s, voiceURI: e.target.value || null }))}>
+                                        <option value="">Browser default</option>
+                                        {availableVoices.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>)}
+                                    </select>
+                                </div>
+                                <div className="field">
+                                    <label htmlFor="lang">Command recognition language</label>
+                                    <select id="lang" value={settings.recogLang} onChange={(e) => setSettings((s) => ({ ...s, recogLang: e.target.value }))}>
+                                        <option value="en-US">English (US)</option>
+                                        <option value="en-GB">English (UK)</option>
+                                        <option value="ur-PK">Urdu (Pakistan)</option>
+                                        <option value="es-ES">Spanish</option>
+                                        <option value="fr-FR">French</option>
+                                        <option value="de-DE">German</option>
+                                    </select>
+                                </div>
+                                <p className="note">The voice settings only affect "define", "spell", "synonyms" and feedback replies. The coach's own voice comes from the server.</p>
                             </div>
-                        ))}
-                </div>
-            )}
-
-            {/* ── BROWSER SUPPORT ── */}
-            {!micSupported && (
-                <div className="speaking-alert">
-                    Your browser doesn't support audio recording.
-                    Try Chrome or Edge.
-                </div>
-            )}
-
-            {/* ── DEFINITION ── */}
-            {currentDefinition && (
-                <div className="speaking-definition">
-                    <div>
-                        <span>Definition</span>
-                        <strong>{currentDefinition.word}</strong>
+                        </Popover>
                     </div>
+                )}
 
-                    <p>{currentDefinition.meaning}</p>
+                {/* Before the conversation starts */}
+                {micSupported && !hasStarted && (
+                    <div className="speak-start">
+                        <Button variant="primary" icon={<TbMicrophone size={18} />} onClick={startConversation} disabled={isProcessing}>
+                            {isProcessing ? "Starting…" : "Start conversation"}
+                        </Button>
+                        {errorMsg && <p className="form-error">{errorMsg}</p>}
+                    </div>
+                )}
 
-                    {currentDefinition.exampleSentence &&
-                        currentDefinition.exampleSentence !==
-                            "No example available" && (
-                            <em>
-                                “{currentDefinition.exampleSentence}”
-                            </em>
+                {/* The conversation: chat bubbles with the coach on the left and you on the right */}
+                {micSupported && hasStarted && (
+                    <>
+                        {vocabWords.length > 0 && (
+                            <p className="note speak-words">Words the coach may bring up: {vocabWords.join(", ")}</p>
                         )}
-                </div>
-            )}
 
-            {/* ── FEEDBACK ── */}
-            {reflection && (
-                <div className="speaking-feedback">
-                    <div>
-                        <span>Session reflection</span>
+                        <div className="chat">
+                            {conversation.map((turn, i) => (
+                                <div key={i} className={`bubble-row${turn.role === "user" ? " bubble-row--me" : ""}`}>
+                                    {turn.role !== "user" && <span className="avatar">C</span>}
+                                    <div className={`bubble${turn.role === "user" ? " bubble--me" : ""}`}>{turn.content}</div>
+                                </div>
+                            ))}
+
+                            {/* The word card shown when you say "define <word>"; "Add it" works by voice or by tapping */}
+                            {currentDefinition && (
+                                <div className="define-card">
+                                    <div className="define-head">
+                                        <strong>{currentDefinition.word}</strong>
+                                        <span className="grow" />
+                                        <Button size="sm" onClick={saveDefinedWord}>Add it</Button>
+                                    </div>
+                                    <p>{currentDefinition.meaning}</p>
+                                    {currentDefinition.exampleSentence && currentDefinition.exampleSentence !== "No example available" && (
+                                        <p className="word-example">"{currentDefinition.exampleSentence}"</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {errorMsg && <p className="form-error">{errorMsg}</p>}
+
+                        {/* What you can say */}
+                        <div className="chip-cloud speak-hints">
+                            {["Define a word", "Add it", "Spell it", "Synonyms", "Repeat"].map((h) => <Chip key={h}>{h}</Chip>)}
+                        </div>
+
+                        {/* One big mic button in the centre */}
+                        <div className="mic-row">
+                            <span className="mic-caption">{isProcessing ? "Thinking…" : isRecording ? "Tap to send" : "Tap to talk"}</span>
+                            <button
+                                type="button"
+                                className={`mic${isRecording ? " is-recording" : ""}`}
+                                onClick={isRecording ? stopRecording : startRecording}
+                                disabled={isProcessing || isEndingSession}
+                                aria-label={isRecording ? "Stop and send" : "Tap to talk"}
+                            >
+                                {isRecording ? <TbPlayerStop size={30} /> : <TbMicrophone size={30} />}
+                            </button>
+                            <Button variant="ghost" onClick={endCurrentSession} disabled={isProcessing || isRecording || isEndingSession}>
+                                {isEndingSession ? "Wrapping up…" : "End session"}
+                            </Button>
+                        </div>
+                    </>
+                )}
+
+                {/* Feedback after a session ends */}
+                {reflection && (
+                    <div className="card card--paper reflection">
+                        <div className="define-head">
+                            <strong>Session feedback</strong>
+                            <span className="grow" />
+                            <Button size="sm" variant="ghost" onClick={() => setReflection(null)}>Dismiss</Button>
+                        </div>
                         <p>{reflection}</p>
                     </div>
+                )}
+            </div>
 
-                    <button
-                        className="speaking-text-btn"
-                        onClick={() => setReflection(null)}
-                    >
-                        Dismiss
-                    </button>
-                </div>
-            )}
-
-            {/* ── START STATE ── */}
-            {micSupported && !hasStarted && (
-                <section className="speaking-start-card">
-                    <div className="speaking-start-mark">
-                        <span>◌</span>
-                    </div>
-
-                    <div>
-                        <p className="speaking-eyebrow">
-                            SPEAKING SESSION
-                        </p>
-
-                        <h2>Ready to practise?</h2>
-
-                        <p>
-                            Start a conversation and speak naturally.
-                            You don't need a script.
-                        </p>
-                    </div>
-
-                    <button
-                        className="speaking-main-btn"
-                        onClick={startConversation}
-                        disabled={isProcessing}
-                    >
-                        {isProcessing
-                            ? "Starting…"
-                            : "Start conversation"}
-                    </button>
-                </section>
-            )}
-
-            {/* ── ACTIVE SESSION ── */}
-            {micSupported && hasStarted && (
-                <section className="speaking-session">
-
-                    {/* We intentionally DO NOT show vocabWords here.
-                        The learner should recall the vocabulary themselves. */}
-
-                    <div className="speaking-chat">
-                        {conversation.map((turn, i) => (
-                            <div
-                                key={i}
-                                className={`speaking-message ${
-                                    turn.role === "user"
-                                        ? "speaking-message-user"
-                                        : "speaking-message-coach"
-                                }`}
-                            >
-                                <span className="speaking-message-label">
-                                    {turn.role === "user"
-                                        ? "You"
-                                        : "Coach"}
-                                </span>
-
-                                <div className="speaking-bubble">
-                                    {turn.content}
-                                </div>
-                            </div>
-                        ))}
-
-                        {isProcessing && (
-                            <div className="speaking-message speaking-message-coach">
-                                <span className="speaking-message-label">
-                                    Coach
-                                </span>
-
-                                <div className="speaking-bubble speaking-thinking">
-                                    Thinking
-                                    <span>.</span>
-                                    <span>.</span>
-                                    <span>.</span>
-                                </div>
+            {/* History: a pop-up (Radix Dialog) listing past conversations */}
+            <Modal
+                open={showHistory}
+                onOpenChange={(open) => { if (!open) { setShowHistory(false); setOpenSessionDetail(null); } }}
+                title="Past conversations"
+                actions={sessions.length > 0 ? <Button size="sm" variant="danger" onClick={clearAllSessions}>Clear all</Button> : undefined}
+            >
+                {isLoadingSessions && <div className="loading"><span /><span /><span /></div>}
+                {!isLoadingSessions && sessions.length === 0 && <p className="note">No past conversations yet.</p>}
+                {!isLoadingSessions && sessions.map((sess) => (
+                    <div key={sess.id} className="session-row">
+                        <div className="session-main" onClick={() => viewSessionDetail(sess.id)}>
+                            <p className="note">{new Date(sess.startedAt).toLocaleString()} · {sess.messageCount} messages · {sess.level}{sess.hasReflection && " · has feedback"}</p>
+                            <p>{sess.preview}…</p>
+                        </div>
+                        <IconButton label="Delete conversation" onClick={() => deleteOneSession(sess.id)}><TbTrash size={17} /></IconButton>
+                        {openSessionDetail?.id === sess.id && (
+                            <div className="session-detail">
+                                {openSessionDetail.transcript.map((turn, i) => (
+                                    <p key={i}><strong>{turn.role === "user" ? "You" : "Coach"}:</strong> {turn.content}</p>
+                                ))}
+                                {openSessionDetail.reflection && <p className="word-example">Feedback: {openSessionDetail.reflection}</p>}
                             </div>
                         )}
                     </div>
-
-                    {errorMsg && (
-                        <p className="speaking-error">{errorMsg}</p>
-                    )}
-
-                    {/* ── VOICE AREA ── */}
-                    <div className="speaking-voice-area">
-                        <button
-                            className={`speaking-mic-btn ${
-                                isRecording
-                                    ? "speaking-mic-btn-recording"
-                                    : ""
-                            }`}
-                            onClick={
-                                isRecording
-                                    ? stopRecording
-                                    : startRecording
-                            }
-                            disabled={isProcessing || isEndingSession}
-                        >
-                            <span className="speaking-mic-icon">
-                                {isProcessing
-                                    ? "✦"
-                                    : isRecording
-                                    ? "■"
-                                    : "⌕"}
-                            </span>
-
-                            <span className="speaking-mic-text">
-                                {isProcessing
-                                    ? "Thinking…"
-                                    : isRecording
-                                    ? "Stop & send"
-                                    : "Tap to talk"}
-                            </span>
-                        </button>
-
-                        <button
-                            className="speaking-end-btn"
-                            onClick={endCurrentSession}
-                            disabled={
-                                isProcessing ||
-                                isRecording ||
-                                isEndingSession
-                            }
-                        >
-                            {isEndingSession
-                                ? "Wrapping up…"
-                                : "End session"}
-                        </button>
-                    </div>
-
-                    {/* ── VOICE COMMANDS ── */}
-                    <div className="speaking-commands">
-                        <div className="speaking-commands-title">
-                            Voice shortcuts
-                        </div>
-
-                        <div className="speaking-command-list">
-                            <span>“Define a word”</span>
-                            <span>“Add it”</span>
-                            <span>“Repeat”</span>
-                            <span>“Spell it”</span>
-                            <span>“Synonyms”</span>
-                        </div>
-                    </div>
-                </section>
-            )}
-
-            {micSupported && errorMsg && !hasStarted && (
-                <p className="speaking-error speaking-start-error">
-                    {errorMsg}
-                </p>
-            )}
-        </main>
-    </AppLayout>
-);
-    
+                ))}
+            </Modal>
+        </AppLayout>
+    );
 }
 
 export default SpeakingPractice;

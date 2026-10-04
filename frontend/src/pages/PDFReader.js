@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import api from "../api";
 import AppLayout from "../components/AppLayout";
+import * as Tooltip from "@radix-ui/react-tooltip"; // Radix Tooltip: the hover card shown on each book
+import { TbBooks, TbLayoutSidebar, TbChevronLeft, TbChevronRight, TbChevronUp, TbChevronDown, TbMinus, TbPlus, TbSearch, TbUpload, TbArrowAutofitWidth, TbTrash, TbBookmark } from "react-icons/tb"; // toolbar and shelf icons
+import { Button, IconButton, Tabs } from "../components/ui"; // shared UI kit
 
 const MIN_ZOOM = 50;
 const MAX_ZOOM = 250;
@@ -56,6 +59,8 @@ function PDFReader() {
     // ─── Saved PDFs (library) ───
     const [showLibrary, setShowLibrary] = useState(true);
     const [savedDocs, setSavedDocs] = useState([]);
+    const [libSearch, setLibSearch] = useState("");   // text typed in the shelf search box
+    const [libSort, setLibSort] = useState("recent");  // shelf order: "recent" | "name" | "bookmarks"
     const [libraryLoading, setLibraryLoading] = useState(false);
     const [libraryError, setLibraryError] = useState("");
     const [uploading, setUploading] = useState(false);
@@ -754,6 +759,12 @@ function PDFReader() {
         return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
     };
 
+    // The books actually shown on the shelf: filtered by the search box, then ordered by the chosen sort.
+    const shelfDocs = savedDocs
+        .filter((d) => d.fileName.toLowerCase().includes(libSearch.toLowerCase()))
+        .sort((a, b) => libSort === "name" ? a.fileName.localeCompare(b.fileName)
+            : libSort === "bookmarks" ? (b.bookmarkCount || 0) - (a.bookmarkCount || 0) : 0); // 0 = keep the server's newest-first order
+
     return (
         <AppLayout reader>
             <div className="reader-layout">
@@ -764,24 +775,17 @@ function PDFReader() {
                     {/* Page thumbnail / bookmarks sidebar — only while a PDF is open */}
                     {pdfLoaded && !showLibrary && (
                         <div className={`reader-thumbs${sidebarOpen ? "" : " collapsed"}`}>
-                            <div className="reader-thumbs-tabs">
-                                <button
-                                    className={`reader-thumbs-tab${sidebarTab === "pages" ? " active" : ""}`}
-                                    onClick={() => setSidebarTab("pages")}>
-                                    Pages
-                                </button>
-                                <button
-                                    className={`reader-thumbs-tab${sidebarTab === "bookmarks" ? " active" : ""}`}
-                                    onClick={() => setSidebarTab("bookmarks")}>
-                                    🔖 {bookmarks.length > 0 ? bookmarks.length : ""}
-                                </button>
-                                <button
-                                    className={`reader-thumbs-tab${sidebarTab === "difficulty" ? " active" : ""}`}
-                                    onClick={() => setSidebarTab("difficulty")}
-                                    title="Difficult words">
-                                    🧠 {diffWords.length > 0 ? diffWords.length : ""}
-                                </button>
-                            </div>
+                            <Tabs
+                                variant="line"
+                                className="reader-tabs"
+                                value={sidebarTab}
+                                onChange={setSidebarTab}
+                                items={[
+                                    { value: "pages", label: "Pages" },
+                                    { value: "bookmarks", label: "Marks", count: bookmarks.length || undefined },
+                                    { value: "difficulty", label: "Hard", count: diffWords.length || undefined },
+                                ]}
+                            />
 
                             {sidebarTab === "pages" && (
                                 <div className="reader-thumbs-list">
@@ -886,206 +890,123 @@ function PDFReader() {
                     )}
 
                     <div className="reader-main">
-                        {/* Toolbar */}
+                        {/* Toolbar: icon buttons with tooltips, grouped (left: library + side panel, centre: pages + zoom, right: search) */}
                         <div className="reader-toolbar">
-                            {showLibrary ? (
-                                <button className="btn btn-primary"
-                                    style={{ width: "auto", fontSize: "0.85rem", padding: "8px 18px" }}
-                                    onClick={() => fileRef.current.click()}
-                                    disabled={uploading}>
-                                    {uploading ? "Uploading..." : "+ Upload New PDF"}
-                                </button>
-                            ) : !pdfLoaded ? (
-                                <button className="btn btn-primary"
-                                    style={{ width: "auto", fontSize: "0.85rem", padding: "8px 18px" }}
-                                    onClick={() => fileRef.current.click()}>
-                                    📄 Open PDF
-                                </button>
+                            {showLibrary || !pdfLoaded ? (
+                                <>
+                                    <span className="reader-toolbar-title">{showLibrary ? "My library" : "PDF reader"}</span>
+                                    <span className="grow" />
+                                    <Button variant="primary" size="sm" icon={<TbUpload size={16} />}
+                                        onClick={() => fileRef.current.click()} disabled={uploading}>
+                                        {uploading ? "Uploading…" : "Upload PDF"}
+                                    </Button>
+                                </>
                             ) : (
                                 <>
-                                    <button className="btn btn-ghost"
-                                        style={{ width: "auto", fontSize: "0.82rem", padding: "6px 14px" }}
-                                        onClick={handleChangePDF}>
-                                        📚 My PDFs
-                                    </button>
+                                    <IconButton label="My PDFs" onClick={handleChangePDF}><TbBooks size={19} /></IconButton>
+                                    <IconButton label="Toggle side panel" active={sidebarOpen} onClick={() => setSidebarOpen((o) => !o)}><TbLayoutSidebar size={19} /></IconButton>
+                                    <span className="reader-toolbar-title" title={fileName}>{fileName}</span>
+                                    <span className="grow" />
 
-                                    <button className="btn btn-ghost"
-                                        style={{ width: "auto", fontSize: "0.82rem", padding: "6px 14px" }}
-                                        onClick={() => setSidebarOpen(o => !o)}
-                                        title="Toggle sidebar">
-                                        ☰
-                                    </button>
-
-                                    <div className="reader-page-controls">
-                                        <button className="btn btn-ghost"
-                                            style={{ width: "auto", padding: "6px 14px" }}
-                                            onClick={() => goToPage(currentPage - 1)}
-                                            disabled={currentPage === 1 || loading}>
-                                            ←
-                                        </button>
-                                        <span style={{ fontSize: "0.85rem", color: "var(--text-2)", whiteSpace: "nowrap" }}>
-                                            Page {currentPage} of {totalPages}
-                                        </span>
-                                        <button className="btn btn-ghost"
-                                            style={{ width: "auto", padding: "6px 14px" }}
-                                            onClick={() => goToPage(currentPage + 1)}
-                                            disabled={currentPage === totalPages || loading}>
-                                            →
-                                        </button>
+                                    <div className="tool-group">
+                                        <IconButton label="Previous page" onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1 || loading}><TbChevronLeft size={18} /></IconButton>
+                                        <span className="tool-label">{currentPage} / {totalPages}</span>
+                                        <IconButton label="Next page" onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages || loading}><TbChevronRight size={18} /></IconButton>
                                     </div>
 
-                                    <div className="reader-zoom-controls">
-                                        <button className="btn btn-ghost"
-                                            style={{ width: "auto", padding: "6px 14px" }}
-                                            onClick={zoomOut}
-                                            title="Zoom out"
-                                            disabled={zoom !== null && zoom <= MIN_ZOOM}>
-                                            −
-                                        </button>
-                                        <span>{zoomLabel}</span>
-                                        <button className="btn btn-ghost"
-                                            style={{ width: "auto", padding: "6px 14px" }}
-                                            onClick={zoomIn}
-                                            title="Zoom in"
-                                            disabled={zoom !== null && zoom >= MAX_ZOOM}>
-                                            +
-                                        </button>
-                                        <button className="btn btn-ghost"
-                                            style={{ width: "auto", padding: "6px 14px", fontSize: "0.7rem" }}
-                                            onClick={fitToWidth}
-                                            title="Fit to width"
-                                            disabled={zoom === null}>
-                                            Fit
-                                        </button>
+                                    <div className="tool-group">
+                                        <IconButton label="Zoom out" onClick={zoomOut} disabled={zoom !== null && zoom <= MIN_ZOOM}><TbMinus size={18} /></IconButton>
+                                        <span className="tool-label">{zoomLabel}</span>
+                                        <IconButton label="Zoom in" onClick={zoomIn} disabled={zoom !== null && zoom >= MAX_ZOOM}><TbPlus size={18} /></IconButton>
+                                        <IconButton label="Fit to width" onClick={fitToWidth} disabled={zoom === null}><TbArrowAutofitWidth size={18} /></IconButton>
                                     </div>
 
-                                    <button className="btn btn-ghost"
-                                        style={{ width: "auto", padding: "6px 14px" }}
-                                        onClick={toggleSearch}
-                                        title="Search in document">
-                                        🔍
-                                    </button>
+                                    <IconButton label="Search in document" active={searchOpen} onClick={toggleSearch}><TbSearch size={18} /></IconButton>
 
                                     {searchOpen && (
                                         <div className="reader-search">
                                             <input
                                                 ref={searchInputRef}
                                                 type="text"
-                                                placeholder="Find in document..."
+                                                placeholder="Find in document"
                                                 value={searchTerm}
-                                                onChange={e => setSearchTerm(e.target.value)}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
                                                 onKeyDown={handleSearchKeyDown}
                                                 onBlur={() => { if (!searchTerm) runSearch(); }}
                                             />
-                                            {matches.length > 0 && (
-                                                <span className="reader-search-count">
-                                                    {activeMatch + 1} / {matches.length}
-                                                </span>
-                                            )}
-                                            <button className="btn btn-ghost" onClick={() => goToMatch(-1)} disabled={matches.length === 0}>↑</button>
-                                            <button className="btn btn-ghost" onClick={() => goToMatch(1)} disabled={matches.length === 0}>↓</button>
-                                            <button className="btn btn-ghost" onClick={runSearch}>Go</button>
+                                            {matches.length > 0 && <span className="reader-search-count">{activeMatch + 1} / {matches.length}</span>}
+                                            <IconButton label="Previous match" onClick={() => goToMatch(-1)} disabled={matches.length === 0}><TbChevronUp size={17} /></IconButton>
+                                            <IconButton label="Next match" onClick={() => goToMatch(1)} disabled={matches.length === 0}><TbChevronDown size={17} /></IconButton>
+                                            <Button size="sm" onClick={runSearch}>Go</Button>
                                         </div>
                                     )}
-
-                                    <span style={{
-                                        fontSize: "0.75rem", color: "var(--text-2)", maxWidth: "180px",
-                                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                        marginLeft: searchOpen ? 0 : "auto", padding: "0 12px"
-                                    }}>
-                                        {fileName}
-                                    </span>
                                 </>
                             )}
-                            <input
-                                ref={fileRef}
-                                type="file"
-                                accept=".pdf"
-                                style={{ display: "none" }}
-                                onChange={handleFileChange}
-                            />
+                            <input ref={fileRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleFileChange} />
                         </div>
 
-                        {/* Library view — wooden bookshelf */}
+                        {/* Library view: search + sort above a wooden shelf. Books are as thick as the PDF is long;
+                            the Upload slot is the first place on the shelf; hovering a book shows its details. */}
                         {showLibrary && (
                             <div className="reader-library">
-                                {libraryLoading && (
-                                    <div className="reader-library-empty">
-                                        <div className="loading-dots"><span/><span/><span/></div>
-                                        <p>Loading your library…</p>
-                                    </div>
-                                )}
+                                {libraryLoading && <div className="loading"><span /><span /><span /></div>}
+                                {!libraryLoading && libraryError && <p className="form-error shelf-msg">{libraryError}</p>}
 
-                                {!libraryLoading && libraryError && (
-                                    <div className="reader-library-empty">
-                                        <p style={{ color: "#f87171" }}>❌ {libraryError}</p>
-                                    </div>
-                                )}
+                                {!libraryLoading && !libraryError && (
+                                    <>
+                                        <div className="shelf-controls">
+                                            <input type="search" placeholder="Search your PDFs" aria-label="Search your PDFs" value={libSearch} onChange={(e) => setLibSearch(e.target.value)} />
+                                            <select aria-label="Sort PDFs" value={libSort} onChange={(e) => setLibSort(e.target.value)}>
+                                                <option value="recent">Recently added</option>
+                                                <option value="name">Name A to Z</option>
+                                                <option value="bookmarks">Most bookmarks</option>
+                                            </select>
+                                        </div>
 
-                                {!libraryLoading && !libraryError && savedDocs.length === 0 && (
-                                    <div className="reader-library-empty">
-                                        <div style={{ fontSize: "2.5rem" }}>📚</div>
-                                        <p>Your shelf is empty.<br/>Upload a PDF to place your first book.</p>
-                                    </div>
-                                )}
+                                        {savedDocs.length === 0 && <p className="note shelf-msg">Your shelf is empty. Upload a PDF to place your first book.</p>}
+                                        {savedDocs.length > 0 && shelfDocs.length === 0 && <p className="note shelf-msg">No PDFs match "{libSearch}".</p>}
 
-                                {!libraryLoading && (
-                                    <div className="reader-library-shelf">
-                                        {/* Group books into rows of 8 per shelf */}
-                                        {Array.from(
-                                            { length: Math.ceil((savedDocs.length + 1) / 8) },
-                                            (_, rowIdx) => {
-                                                const rowBooks = savedDocs.slice(rowIdx * 8, rowIdx * 8 + 8);
+                                        <div className="shelf">
+                                            {/* Group the shelf items into rows of 8; the first item is always the Upload slot */}
+                                            {Array.from({ length: Math.ceil((shelfDocs.length + 1) / 8) }, (_, rowIdx) => {
+                                                const items = [{ upload: true }, ...shelfDocs].slice(rowIdx * 8, rowIdx * 8 + 8);
                                                 return (
-                                                    <div key={rowIdx} className="reader-library-shelf-row">
-                                                        {rowBooks.map(doc => {
-                                                            const color = BOOK_COLORS[
-                                                                parseInt(doc._id.slice(-4), 16) % BOOK_COLORS.length
-                                                            ];
+                                                    <div key={rowIdx} className="shelf-row">
+                                                        {items.map((doc) => {
+                                                            if (doc.upload) return (
+                                                                <button key="upload" className="book book--upload" onClick={() => fileRef.current.click()} disabled={uploading} aria-label="Upload new PDF">
+                                                                    <TbPlus size={20} />
+                                                                    <span>Add PDF</span>
+                                                                </button>
+                                                            );
+                                                            const color = BOOK_COLORS[parseInt(doc._id.slice(-4), 16) % BOOK_COLORS.length];
                                                             const shortName = doc.fileName.replace(/\.pdf$/i, "");
+                                                            const thickness = Math.min(62, Math.max(36, 30 + (doc.pageCount || 0) / 6)); // longer PDF = thicker spine
                                                             return (
-                                                                <div
-                                                                    key={doc._id}
-                                                                    className="reader-library-book"
-                                                                    style={{ background: color }}
-                                                                    onClick={() => openSavedDoc(doc)}
-                                                                    title={shortName}>
-                                                                    {doc.bookmarkCount > 0 && (
-                                                                        <div className="reader-library-book-badge">
-                                                                            🔖 {doc.bookmarkCount}
+                                                                <Tooltip.Root key={doc._id}>
+                                                                    <Tooltip.Trigger asChild>
+                                                                        <div className="book" role="button" tabIndex={0} style={{ background: color, width: thickness }}
+                                                                            onClick={() => openSavedDoc(doc)}
+                                                                            onKeyDown={(e) => e.key === "Enter" && openSavedDoc(doc)}>
+                                                                            {doc.bookmarkCount > 0 && <span className="book-badge">{doc.bookmarkCount}</span>}
+                                                                            <span className="book-title">{shortName}</span>
+                                                                            <button className="book-delete" aria-label={`Delete ${shortName}`} onClick={(e) => handleDeleteDoc(e, doc._id)}><TbTrash size={14} /></button>
                                                                         </div>
-                                                                    )}
-                                                                    <div className="reader-library-book-title">
-                                                                        {shortName}
-                                                                    </div>
-                                                                    <div className="reader-library-book-pages">
-                                                                        {doc.pageCount ? `${doc.pageCount}p` : ""}
-                                                                    </div>
-                                                                    <button
-                                                                        className="reader-library-book-delete"
-                                                                        onClick={(e) => handleDeleteDoc(e, doc._id)}
-                                                                        title="Delete PDF">
-                                                                        ✕
-                                                                    </button>
-                                                                </div>
+                                                                    </Tooltip.Trigger>
+                                                                    <Tooltip.Portal>
+                                                                        <Tooltip.Content className="tooltip tooltip--card" sideOffset={8}>
+                                                                            <strong>{shortName}</strong>
+                                                                            <span>{doc.pageCount ? `${doc.pageCount} pages` : "PDF"}{doc.bookmarkCount ? ` · ${doc.bookmarkCount} bookmarks` : ""}</span>
+                                                                        </Tooltip.Content>
+                                                                    </Tooltip.Portal>
+                                                                </Tooltip.Root>
                                                             );
                                                         })}
-                                                        {/* Upload slot on last shelf row */}
-                                                        {rowIdx === Math.ceil((savedDocs.length + 1) / 8) - 1 && (
-                                                            <button
-                                                                className="reader-library-upload-btn"
-                                                                onClick={() => fileRef.current.click()}
-                                                                disabled={uploading}
-                                                                title="Upload new PDF">
-                                                                <span style={{ fontSize: "1.4rem" }}>+</span>
-                                                                <span>Upload</span>
-                                                            </button>
-                                                        )}
                                                     </div>
                                                 );
-                                            }
-                                        )}
-                                    </div>
+                                            })}
+                                        </div>
+                                    </>
                                 )}
                             </div>
                         )}
@@ -1132,18 +1053,16 @@ function PDFReader() {
                     </div>
                 </div>
 
-                {/* RIGHT — Context Panel */}
-                <div className="reader-right">
-                    <h3 style={{ fontFamily: "Fraunces, serif", marginBottom: "20px", fontSize: "1.3rem" }}>
-                        🔍 Contextual Meaning
-                    </h3>
+                {/* RIGHT: word panel. Select text in the PDF, ask about a word, then add it to your words. */}
+                <aside className="reader-right">
+                    <h3 className="panel-title">Contextual meaning</h3>
 
                     {!selectedText && (
                         <div className="reader-tip">
-                            <p style={{ fontWeight: 600, marginBottom: "8px" }}>💡 How to use:</p>
-                            <ol style={{ paddingLeft: "16px", fontSize: "0.85rem", lineHeight: "2", color: "var(--text-2)" }}>
-                                <li>Open any PDF on the left</li>
-                                <li>Select a word or short phrase for its meaning</li>
+                            <p className="reader-tip-title">How to use</p>
+                            <ol>
+                                <li>Open a PDF from your library</li>
+                                <li>Select a word or short phrase to see its meaning</li>
                                 <li>Select a longer passage to save it as a bookmark</li>
                             </ol>
                         </div>
@@ -1151,104 +1070,78 @@ function PDFReader() {
 
                     {selectedText && (
                         <div className="reader-selected-text">
-                            <p className="context-label" style={{ marginBottom: "8px" }}>
-                                {isLongSelection ? "Selected passage:" : "Selected paragraph:"}
-                            </p>
-                            <p style={{ fontSize: "0.83rem", lineHeight: "1.7", color: "#555", fontStyle: "italic" }}>
-                                "{selectedText.length > 250 ? selectedText.substring(0, 250) + "..." : selectedText}"
-                            </p>
+                            <p className="context-label">{isLongSelection ? "Selected passage" : "Selected text"}</p>
+                            <p className="selected-quote">"{selectedText.length > 250 ? selectedText.substring(0, 250) + "…" : selectedText}"</p>
                         </div>
                     )}
 
-                    {/* Long selection → bookmark flow */}
+                    {/* Long selection: save it as a bookmark */}
                     {selectedText && isLongSelection && (
-                        <div style={{ marginTop: "16px" }}>
-                            <button className="btn btn-primary"
-                                style={{ width: "100%" }}
+                        <div className="panel-block">
+                            <Button variant="primary" block icon={<TbBookmark size={17} />}
                                 onClick={handleSaveBookmark}
                                 disabled={bookmarkSaving || bookmarkSaved || !currentDocId}>
-                                {bookmarkSaved ? "🔖 Saved to Bookmarks!" : bookmarkSaving ? "Saving..." : "🔖 Save as Bookmark"}
-                            </button>
-                            {!currentDocId && (
-                                <p style={{ fontSize: "0.72rem", color: "var(--text-3)", marginTop: "8px" }}>
-                                    Bookmarks are only available for PDFs saved to your library.
-                                </p>
-                            )}
+                                {bookmarkSaved ? "Saved to bookmarks" : bookmarkSaving ? "Saving…" : "Save as bookmark"}
+                            </Button>
+                            {!currentDocId && <p className="note">Bookmarks are only available for PDFs saved to your library.</p>}
                         </div>
                     )}
 
-                    {/* Short selection → word lookup flow */}
+                    {/* Short selection: look a word up */}
                     {!isLongSelection && (
-                        <div style={{ marginTop: "16px" }}>
+                        <div className="panel-block">
                             <p className="context-label">Which word confuses you?</p>
-                            <div style={{ display: "flex", gap: "8px" }}>
+                            <div className="panel-row">
                                 <input
-                                    placeholder="Type the word..."
+                                    placeholder="Type the word"
                                     value={word}
-                                    onChange={e => setWord(e.target.value.toLowerCase().replace(/[^a-z]/g, ""))}
-                                    onKeyDown={e => e.key === "Enter" && handleExplain()}
-                                    style={{ flex: 1, margin: 0 }}
+                                    onChange={(e) => setWord(e.target.value.toLowerCase().replace(/[^a-z]/g, ""))}
+                                    onKeyDown={(e) => e.key === "Enter" && handleExplain()}
                                     disabled={!selectedText}
                                 />
-                                <button className="btn btn-primary"
-                                    style={{ width: "auto", whiteSpace: "nowrap" }}
-                                    onClick={handleExplain}
-                                    disabled={!selectedText || !word || explaining}>
-                                    {explaining ? "..." : "Explain"}
-                                </button>
+                                <Button variant="primary" onClick={handleExplain} disabled={!selectedText || !word || explaining}>
+                                    {explaining ? "…" : "Explain"}
+                                </Button>
                             </div>
                         </div>
                     )}
 
                     {explaining && (
-                        <div style={{ textAlign: "center", padding: "28px 0" }}>
-                            <div className="loading-dots"><span/><span/><span/></div>
-                            <p style={{ color: "var(--text-2)", marginTop: "12px", fontSize: "0.85rem" }}>
-                                Reading your context...
-                            </p>
-                        </div>
+                        <div className="loading"><span /><span /><span /></div>
                     )}
 
-                    {error && (
-                        <div className="context-error" style={{ marginTop: "12px" }}>❌ {error}</div>
-                    )}
+                    {error && <p className="form-error panel-block">{error}</p>}
 
                     {result && !explaining && (
                         <div className="reader-result">
-                            <div className="result-word" style={{ fontSize: "1.5rem" }}>"{word}"</div>
+                            <div className="result-word">{word}</div>
 
                             <div className="result-section">
-                                <p className="result-label">In this context means:</p>
+                                <p className="result-label">In this context</p>
                                 <p className="result-explanation">{result.explanation}</p>
                             </div>
 
                             {result.example && (
                                 <div className="result-section">
-                                    <p className="result-label">Simpler way to think:</p>
+                                    <p className="result-label">A simpler way to think</p>
                                     <p className="result-simpler">{result.example}</p>
                                 </div>
                             )}
 
                             {result.relatedWords && (
-                                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "16px" }}>
-                                    {(Array.isArray(result.relatedWords)
-                                        ? result.relatedWords
-                                        : result.relatedWords.split(",").map(w => w.trim())
-                                    ).map((w, i) => (
-                                        <span key={i} className="related-chip">{w}</span>
+                                <div className="chip-cloud result-chips">
+                                    {(Array.isArray(result.relatedWords) ? result.relatedWords : result.relatedWords.split(",").map((w) => w.trim())).map((w, i) => (
+                                        <span key={i} className="chip">{w}</span>
                                     ))}
                                 </div>
                             )}
 
-                            <button className="btn btn-primary"
-                                onClick={handleAdd}
-                                disabled={added}
-                                style={{ width: "100%" }}>
-                                {added ? "✅ Added to My Words!" : "+ Add to My Words"}
-                            </button>
+                            <Button variant="primary" block onClick={handleAdd} disabled={added}>
+                                {added ? "Added to My Words" : "Add to My Words"}
+                            </Button>
                         </div>
                     )}
-                </div>
+                </aside>
             </div>
         </AppLayout>
     );
