@@ -452,235 +452,436 @@ function SpeakingPractice() {
     const micSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
 
     return (
-        <AppLayout>
-            <div style={{ maxWidth: 640, margin: "0 auto", padding: "24px 16px" }}>
+      return (
+    <AppLayout>
+        <div className="speaking-page">
+
+            {/* WordKnit centered page header */}
+            <header className="speaking-header">
+                <div className="speaking-brand">WORDKNIT</div>
+                <div className="speaking-header-line" />
                 <h1>Speaking Practice</h1>
-                <p style={{ color: "var(--text-2)" }}>
-                    Have an open conversation with an AI coach — it replies out loud, gently
-                    models correct grammar, and tries to work your saved words into the chat.
-                    {settings.wakeWordEnabled && " Just say \"WordKnit\" any time to start talking."}
+                <p>
+                    Practice speaking naturally with your AI coach.
+                    Your saved vocabulary can become part of the conversation.
                 </p>
+            </header>
 
-                {!micSupported && (
-                    <div style={{ padding: 16, border: "1px solid var(--accent)", borderRadius: 8 }}>
-                        Your browser doesn't support audio recording. Try Chrome or Edge.
+            {!micSupported && (
+                <div className="speaking-alert">
+                    Your browser doesn't support audio recording.
+                    Try Chrome or Edge.
+                </div>
+            )}
+
+            {micSupported && (
+                <div className="speaking-toolbar">
+                    <button
+                        className="speaking-small-btn"
+                        onClick={() => setShowSettings((v) => !v)}
+                    >
+                        ⚙️ Settings
+                    </button>
+
+                    <button
+                        className="speaking-small-btn"
+                        onClick={toggleHistory}
+                    >
+                        🕒 History
+                    </button>
+                </div>
+            )}
+
+            {/* Settings */}
+            {showSettings && (
+                <div className="speaking-panel">
+                    <div className="speaking-panel-heading">
+                        <h3>Speaking settings</h3>
+                        <span>Personalize your practice</span>
                     </div>
-                )}
 
-                {micSupported && (
-                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-                        <button className="btn btn-secondary" onClick={() => setShowSettings((v) => !v)}>⚙️ Settings</button>
-                        <button className="btn btn-secondary" onClick={toggleHistory}>🕒 History</button>
-                    </div>
-                )}
+                    <label className="speaking-field">
+                        <span>Speaking level</span>
 
-                {showSettings && (
-                    <div style={{ marginBottom: 16, padding: 16, border: "1px solid var(--border)", borderRadius: 8 }}>
-                        <h4 style={{ marginTop: 0 }}>Settings</h4>
+                        <select
+                            value={levelLoaded ? level : ""}
+                            onChange={(e) => changeLevel(e.target.value)}
+                            disabled={!levelLoaded}
+                        >
+                            {!levelLoaded && <option value="">Loading…</option>}
 
-                        <label style={{ display: "block", marginBottom: 12 }}>
-                            Speaking level
-                            <select
-                                value={levelLoaded ? level : ""}
-                                onChange={(e) => changeLevel(e.target.value)}
-                                style={{ width: "100%", padding: 8 }}
-                                disabled={!levelLoaded}
-                            >
-                                {!levelLoaded && <option value="">Loading…</option>}
-                                {LEVEL_OPTIONS.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                            </select>
-                            <span style={{ display: "block", fontSize: 12, color: "var(--text-3)", marginTop: 4 }}>
-                                Changes take effect on your NEXT conversation, not the one already in progress.
-                            </span>
-                        </label>
+                            {LEVEL_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                </option>
+                            ))}
+                        </select>
 
-                        <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                            <input
-                                type="checkbox"
-                                checked={settings.wakeWordEnabled}
-                                onChange={(e) => setSettings((s) => ({ ...s, wakeWordEnabled: e.target.checked }))}
-                            />
-                            Listen for the wake word ("WordKnit") to start each turn hands-free
-                        </label>
+                        <small>
+                            Changes take effect on your next conversation.
+                        </small>
+                    </label>
 
-                        <p style={{ fontSize: 13, color: "var(--text-3)", marginTop: -6, marginBottom: 12 }}>
-                            The settings below only affect the voice used for "define"/"spell"/"synonyms"/feedback
-                            replies — your coach's own conversational voice is generated on the server and isn't
-                            changed by these.
-                        </p>
+                    <label className="speaking-checkbox">
+                        <input
+                            type="checkbox"
+                            checked={settings.wakeWordEnabled}
+                            onChange={(e) =>
+                                setSettings((s) => ({
+                                    ...s,
+                                    wakeWordEnabled: e.target.checked
+                                }))
+                            }
+                        />
 
-                        <label style={{ display: "block", marginBottom: 12 }}>
+                        <span>
+                            Listen for “WordKnit” to start each turn hands-free.
+                        </span>
+                    </label>
+
+                    <label className="speaking-field">
+                        <span>
                             Local voice speed: {settings.rate.toFixed(2)}x
-                            <input
-                                type="range" min="0.5" max="1.5" step="0.05"
-                                value={settings.rate}
-                                onChange={(e) => setSettings((s) => ({ ...s, rate: parseFloat(e.target.value) }))}
-                                style={{ width: "100%" }}
-                            />
-                        </label>
+                        </span>
 
-                        <label style={{ display: "block", marginBottom: 12 }}>
-                            Local voice
-                            <select
-                                value={settings.voiceURI || ""}
-                                onChange={(e) => setSettings((s) => ({ ...s, voiceURI: e.target.value || null }))}
-                                style={{ width: "100%", padding: 8 }}
-                            >
-                                <option value="">Browser default</option>
-                                {availableVoices.map((v) => (
-                                    <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>
-                                ))}
-                            </select>
-                        </label>
+                        <input
+                            type="range"
+                            min="0.5"
+                            max="1.5"
+                            step="0.05"
+                            value={settings.rate}
+                            onChange={(e) =>
+                                setSettings((s) => ({
+                                    ...s,
+                                    rate: parseFloat(e.target.value)
+                                }))
+                            }
+                        />
+                    </label>
 
-                        <label style={{ display: "block" }}>
-                            Wake word / command recognition language
-                            <select
-                                value={settings.recogLang}
-                                onChange={(e) => setSettings((s) => ({ ...s, recogLang: e.target.value }))}
-                                style={{ width: "100%", padding: 8 }}
-                            >
-                                <option value="en-US">English (US)</option>
-                                <option value="en-GB">English (UK)</option>
-                                <option value="ur-PK">Urdu (Pakistan)</option>
-                                <option value="es-ES">Spanish</option>
-                                <option value="fr-FR">French</option>
-                                <option value="de-DE">German</option>
-                            </select>
-                        </label>
-                    </div>
-                )}
+                    <label className="speaking-field">
+                        <span>Local voice</span>
 
-                {showHistory && (
-                    <div style={{ marginBottom: 16, padding: 16, border: "1px solid var(--border)", borderRadius: 8 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <h4 style={{ margin: 0 }}>Past conversations</h4>
-                            {sessions.length > 0 && <button className="btn btn-secondary" onClick={clearAllSessions}>Clear all</button>}
+                        <select
+                            value={settings.voiceURI || ""}
+                            onChange={(e) =>
+                                setSettings((s) => ({
+                                    ...s,
+                                    voiceURI: e.target.value || null
+                                }))
+                            }
+                        >
+                            <option value="">Browser default</option>
+
+                            {availableVoices.map((v) => (
+                                <option key={v.voiceURI} value={v.voiceURI}>
+                                    {v.name} ({v.lang})
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+
+                    <label className="speaking-field">
+                        <span>Recognition language</span>
+
+                        <select
+                            value={settings.recogLang}
+                            onChange={(e) =>
+                                setSettings((s) => ({
+                                    ...s,
+                                    recogLang: e.target.value
+                                }))
+                            }
+                        >
+                            <option value="en-US">English (US)</option>
+                            <option value="en-GB">English (UK)</option>
+                            <option value="ur-PK">Urdu (Pakistan)</option>
+                            <option value="es-ES">Spanish</option>
+                            <option value="fr-FR">French</option>
+                            <option value="de-DE">German</option>
+                        </select>
+                    </label>
+                </div>
+            )}
+
+            {/* History */}
+            {showHistory && (
+                <div className="speaking-panel">
+                    <div className="speaking-panel-heading speaking-history-heading">
+                        <div>
+                            <h3>Past conversations</h3>
+                            <span>Your previous speaking sessions</span>
                         </div>
 
-                        {isLoadingSessions && <p style={{ color: "var(--text-2)" }}>Loading…</p>}
-
-                        {!isLoadingSessions && sessions.length === 0 && (
-                            <p style={{ color: "var(--text-2)" }}>No past conversations yet.</p>
+                        {sessions.length > 0 && (
+                            <button
+                                className="speaking-small-btn"
+                                onClick={clearAllSessions}
+                            >
+                                Clear all
+                            </button>
                         )}
+                    </div>
 
-                        {!isLoadingSessions && sessions.map((s) => (
-                            <div key={s.id} style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                                    <div style={{ cursor: "pointer", flex: 1 }} onClick={() => viewSessionDetail(s.id)}>
-                                        <p style={{ margin: 0, fontSize: 12, color: "var(--text-3)" }}>
-                                            {new Date(s.startedAt).toLocaleString()} · {s.messageCount} messages · {s.level}
-                                            {s.hasReflection && " · has feedback"}
-                                        </p>
-                                        <p style={{ margin: "4px 0 0", fontSize: 14 }}>{s.preview}…</p>
-                                    </div>
-                                    <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => deleteOneSession(s.id)}>Delete</button>
+                    {isLoadingSessions && (
+                        <p className="speaking-muted">Loading…</p>
+                    )}
+
+                    {!isLoadingSessions && sessions.length === 0 && (
+                        <p className="speaking-muted">
+                            No past conversations yet.
+                        </p>
+                    )}
+
+                    {!isLoadingSessions &&
+                        sessions.map((s) => (
+                            <div className="speaking-history-item" key={s.id}>
+                                <div
+                                    className="speaking-history-content"
+                                    onClick={() => viewSessionDetail(s.id)}
+                                >
+                                    <small>
+                                        {new Date(s.startedAt).toLocaleString()}
+                                        {" · "}
+                                        {s.messageCount} messages
+                                        {" · "}
+                                        {s.level}
+                                    </small>
+
+                                    <p>{s.preview}…</p>
                                 </div>
 
+                                <button
+                                    className="speaking-delete-btn"
+                                    onClick={() => deleteOneSession(s.id)}
+                                >
+                                    Delete
+                                </button>
+
                                 {openSessionDetail?.id === s.id && (
-                                    <div style={{ marginTop: 8, marginLeft: 8, maxHeight: 200, overflowY: "auto" }}>
-                                        {openSessionDetail.transcript.map((turn, i) => (
-                                            <p key={i} style={{ margin: "4px 0", fontSize: 14 }}>
-                                                <strong>{turn.role === "user" ? "You" : "Coach"}:</strong> {turn.content}
-                                            </p>
-                                        ))}
+                                    <div className="speaking-history-detail">
+                                        {openSessionDetail.transcript.map(
+                                            (turn, i) => (
+                                                <p key={i}>
+                                                    <strong>
+                                                        {turn.role === "user"
+                                                            ? "You"
+                                                            : "Coach"}
+                                                        :
+                                                    </strong>{" "}
+                                                    {turn.content}
+                                                </p>
+                                            )
+                                        )}
+
                                         {openSessionDetail.reflection && (
-                                            <p style={{ marginTop: 8, fontSize: 14, fontStyle: "italic" }}>
-                                                Feedback: {openSessionDetail.reflection}
+                                            <p className="speaking-feedback-text">
+                                                Feedback:{" "}
+                                                {openSessionDetail.reflection}
                                             </p>
                                         )}
                                     </div>
                                 )}
                             </div>
                         ))}
-                    </div>
-                )}
+                </div>
+            )}
 
-                {currentDefinition && (
-                    <div style={{ marginBottom: 16, padding: 16, border: "1px solid var(--border)", borderRadius: 8 }}>
-                        <h3 style={{ margin: 0 }}>{currentDefinition.word}</h3>
-                        <p>{currentDefinition.meaning}</p>
-                        {currentDefinition.exampleSentence && currentDefinition.exampleSentence !== "No example available" && (
-                            <p style={{ fontStyle: "italic", color: "var(--text-2)" }}>"{currentDefinition.exampleSentence}"</p>
-                        )}
-                    </div>
-                )}
+            {/* Definition card */}
+            {currentDefinition && (
+                <div className="vocab-note">
+                    <div className="vocab-note-label">Vocabulary note</div>
 
-                {reflection && (
-                    <div style={{ marginBottom: 16, padding: 16, border: "1px solid var(--accent)", borderRadius: 8, background: "var(--accent-bg)" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                            <h4 style={{ margin: 0 }}>Session feedback</h4>
-                            <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => setReflection(null)}>Dismiss</button>
-                        </div>
-                        <p style={{ marginBottom: 0 }}>{reflection}</p>
-                    </div>
-                )}
+                    <h3>{currentDefinition.word}</h3>
 
-                {micSupported && !hasStarted && (
-                    <button className="btn btn-primary" style={{ fontSize: 18, padding: "14px 28px" }} onClick={startConversation} disabled={isProcessing}>
-                        {isProcessing ? "Starting…" : "Start Conversation"}
-                    </button>
-                )}
+                    <p>{currentDefinition.meaning}</p>
 
-                {micSupported && errorMsg && !hasStarted && (
-                    <p style={{ color: "var(--accent)" }}>{errorMsg}</p>
-                )}
-
-                {micSupported && hasStarted && (
-                    <>
-                        {vocabWords.length > 0 && (
-                            <p style={{ fontSize: 13, color: "var(--text-3)" }}>
-                                Words the coach may bring up: {vocabWords.join(", ")}
+                    {currentDefinition.exampleSentence &&
+                        currentDefinition.exampleSentence !==
+                            "No example available" && (
+                            <p className="vocab-example">
+                                “{currentDefinition.exampleSentence}”
                             </p>
                         )}
+                </div>
+            )}
 
-                        <p style={{ fontSize: 13, color: "var(--text-3)" }}>
-                            Try saying "define &lt;word&gt;", "add it" to save one, "spell it", "synonyms", or "repeat".
-                        </p>
+            {/* Feedback */}
+            {reflection && (
+                <div className="speaking-feedback">
+                    <div>
+                        <span className="speaking-feedback-label">
+                            Session reflection
+                        </span>
 
-                        <div style={{ margin: "20px 0", maxHeight: 320, overflowY: "auto" }}>
-                            {conversation.map((turn, i) => (
-                                <div key={i} style={{ marginBottom: 10, textAlign: turn.role === "user" ? "right" : "left" }}>
-                                    <span style={{
-                                        display: "inline-block",
-                                        padding: "8px 14px",
-                                        borderRadius: 12,
-                                        background: turn.role === "user" ? "var(--accent-bg)" : "var(--bg)",
-                                        border: "1px solid var(--text-3)"
-                                    }}>
-                                        {turn.content}
+                        <h3>Nice work today.</h3>
+
+                        <p>{reflection}</p>
+                    </div>
+
+                    <button
+                        className="speaking-small-btn"
+                        onClick={() => setReflection(null)}
+                    >
+                        Dismiss
+                    </button>
+                </div>
+            )}
+
+            {/* Start screen */}
+            {micSupported && !hasStarted && (
+                <section className="speaking-start-card">
+                    <div className="speaking-start-icon">🎙️</div>
+
+                    <h2>Ready to practise?</h2>
+
+                    <p>
+                        Start a conversation and talk naturally.
+                        Your coach will respond out loud.
+                    </p>
+
+                    <button
+                        className="speaking-main-btn"
+                        onClick={startConversation}
+                        disabled={isProcessing}
+                    >
+                        {isProcessing
+                            ? "Starting…"
+                            : "Start Conversation"}
+                    </button>
+                </section>
+            )}
+
+            {micSupported && errorMsg && !hasStarted && (
+                <p className="speaking-error">{errorMsg}</p>
+            )}
+
+            {/* Active conversation */}
+            {micSupported && hasStarted && (
+                <section className="speaking-session">
+
+                    {/* Vocabulary */}
+                    {vocabWords.length > 0 && (
+                        <div className="speaking-vocab-section">
+                            <div>
+                                <span className="speaking-section-label">
+                                    Today's vocabulary
+                                </span>
+
+                                <p>
+                                    Try using these naturally during the
+                                    conversation.
+                                </p>
+                            </div>
+
+                            <div className="speaking-vocab-list">
+                                {vocabWords.map((word) => (
+                                    <span
+                                        className="speaking-vocab-chip"
+                                        key={word}
+                                    >
+                                        {word}
                                     </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Conversation */}
+                    <div className="speaking-chat">
+                        {conversation.map((turn, i) => (
+                            <div
+                                key={i}
+                                className={`speaking-message ${
+                                    turn.role === "user"
+                                        ? "speaking-message-user"
+                                        : "speaking-message-coach"
+                                }`}
+                            >
+                                <span className="speaking-message-label">
+                                    {turn.role === "user" ? "You" : "Coach"}
+                                </span>
+
+                                <div className="speaking-bubble">
+                                    {turn.content}
                                 </div>
-                            ))}
-                        </div>
+                            </div>
+                        ))}
 
-                        {errorMsg && <p style={{ color: "var(--accent)" }}>{errorMsg}</p>}
+                        {isProcessing && (
+                            <div className="speaking-message speaking-message-coach">
+                                <span className="speaking-message-label">
+                                    Coach
+                                </span>
 
-                        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                            <button
-                                className="btn btn-primary"
-                                style={{ fontSize: 18, padding: "14px 28px" }}
-                                onClick={isRecording ? stopRecording : startRecording}
-                                disabled={isProcessing || isEndingSession}
-                            >
-                                {isProcessing ? "Thinking…" : isRecording ? "⏹ Stop & Send" : "🎤 Tap to Talk"}
-                            </button>
+                                <div className="speaking-bubble speaking-thinking">
+                                    Thinking<span>.</span><span>.</span><span>.</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
-                            <button
-                                className="btn btn-secondary"
-                                style={{ fontSize: 16, padding: "14px 20px" }}
-                                onClick={endCurrentSession}
-                                disabled={isProcessing || isRecording || isEndingSession}
-                            >
-                                {isEndingSession ? "Wrapping up…" : "End Session"}
-                            </button>
-                        </div>
-                    </>
-                )}
-            </div>
-        </AppLayout>
+                    {errorMsg && (
+                        <p className="speaking-error">{errorMsg}</p>
+                    )}
+
+                    {/* Controls */}
+                    <div className="speaking-controls">
+
+                        <button
+                            className={`speaking-mic-btn ${
+                                isRecording
+                                    ? "speaking-mic-btn-recording"
+                                    : ""
+                            }`}
+                            onClick={
+                                isRecording
+                                    ? stopRecording
+                                    : startRecording
+                            }
+                            disabled={isProcessing || isEndingSession}
+                        >
+                            <span className="speaking-mic-icon">
+                                {isProcessing
+                                    ? "✦"
+                                    : isRecording
+                                    ? "■"
+                                    : "🎙️"}
+                            </span>
+
+                            <span>
+                                {isProcessing
+                                    ? "Thinking…"
+                                    : isRecording
+                                    ? "Stop & Send"
+                                    : "Tap to Talk"}
+                            </span>
+                        </button>
+
+                        <button
+                            className="speaking-end-btn"
+                            onClick={endCurrentSession}
+                            disabled={
+                                isProcessing ||
+                                isRecording ||
+                                isEndingSession
+                            }
+                        >
+                            {isEndingSession
+                                ? "Wrapping up…"
+                                : "End Session"}
+                        </button>
+                    </div>
+
+                    <p className="speaking-command-hint">
+                        You can also say “define a word”, “add it”,
+                        “spell it”, “synonyms”, or “repeat”.
+                    </p>
+                </section>
+            )}
+        </div>
+    </AppLayout>
+);
     );
 }
 
