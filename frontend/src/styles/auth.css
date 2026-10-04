@@ -1,0 +1,10 @@
+/* ═══════════════════════════════════════════════════════════════
+   AUTH — the sign-in and create-account pages: one white card centred on the yellow page.
+═══════════════════════════════════════════════════════════════ */
+.auth-page { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.auth-card { width: min(400px, 100%); background: var(--white); border-radius: var(--radius-xl); padding: 32px 30px 28px; }
+.auth-brand { display: flex; flex-direction: column; align-items: center; margin-bottom: 24px; }
+.auth-name { font-family: var(--font-head); font-size: 28px; font-weight: 700; color: var(--ink); margin-top: 8px; }
+.auth-tagline { font-size: 14px; color: var(--muted); margin-top: 2px; }
+.auth-link { text-align: center; margin-top: 16px; font-size: 14px; color: var(--muted); }
+.auth-link .link-btn { margin: 0; color: var(--ink); font-weight: 600; font-size: 14px; }

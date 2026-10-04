@@ -1,0 +1,58 @@
+/* ═══════════════════════════════════════════════════════════════
+   DESIGN TOKENS — the one place that defines WordKnit's look.
+   Every other stylesheet reads these variables, so changing a color or a
+   corner size here changes it everywhere (that is what keeps the app consistent).
+   The look: yellow brand, white pages, black text, thin soft lines, serif headlines.
+═══════════════════════════════════════════════════════════════ */
+
+/* Fonts: Playfair Display = headlines, DM Sans = everything you click or read in the UI,
+   Libre Baskerville = long reading text (examples, quotes). */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=DM+Sans:wght@400;500;600&family=Libre+Baskerville:ital@0;1&display=swap');
+
+:root {
+  /* Brand colors */
+  --yellow: #f4c542;          /* the WordKnit yellow: page frame, active menu item, small accents */
+  --yellow-soft: #fdf1c7;     /* a pale yellow for highlights and selected rows */
+  --ink: #111111;             /* main text and primary buttons */
+
+  /* Neutrals */
+  --ink-2: #3d3d3d;           /* body text */
+  --muted: #6b6b6b;           /* secondary text */
+  --faint: #9a9a9a;           /* placeholders and tiny labels */
+  --white: #ffffff;           /* cards and the main panel */
+  --paper: #fbf9f3;           /* sidebar and soft backgrounds */
+  --wash: #f3efe4;            /* hover backgrounds and tab tracks */
+  --line: rgba(0, 0, 0, 0.10);        /* the standard thin border */
+  --line-strong: rgba(0, 0, 0, 0.20); /* a firmer border (inputs, focus) */
+
+  /* Status colors (used sparingly) */
+  --green: #2d6a4f;
+  --green-soft: #e4f1ea;
+  --danger: #b3261e;
+  --danger-soft: #fbeae8;
+
+  /* Typography */
+  --font-head: 'Playfair Display', Georgia, serif;
+  --font-body: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-read: 'Libre Baskerville', Georgia, serif;
+
+  /* Shape and size */
+  --radius-sm: 8px;           /* buttons, small controls */
+  --radius: 10px;             /* inputs, tiles */
+  --radius-lg: 14px;          /* cards, dialogs */
+  --radius-xl: 18px;          /* the big white panel */
+  --sidebar-w: 232px;
+  --topbar-h: 56px;
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.18); /* floating things: dialogs, tooltips, popovers */
+
+  /* Aliases: a few pages still use older variable names in inline styles. They point at the new tokens. */
+  --text: var(--ink);
+  --text-2: var(--muted);
+  --text-3: var(--faint);
+  --accent: var(--danger);
+  --accent-bg: var(--danger-soft);
+  --border: var(--line);
+  --surface: var(--paper);
+  --bg: var(--white);
+  --red: var(--danger);
+}

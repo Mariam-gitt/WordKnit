@@ -1,1 +1,12 @@
-/* legacy - superseded by src/index.css */
+/* Entry stylesheet: it only lists the other files, in the order they should load.
+   tokens (colors/fonts) → base (reset) → layout (frame/sidebar/top bar) → ui (shared components) → one file per area. */
+@import "./tokens.css";
+@import "./base.css";
+@import "./layout.css";
+@import "./ui.css";
+@import "./words.css";
+@import "./auth.css";
+@import "./practice.css";
+@import "./reader.css";
+@import "./speaking.css";
+@import "./profile.css";

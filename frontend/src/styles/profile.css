@@ -1,0 +1,43 @@
+/* ═══════════════════════════════════════════════════════════════
+   WORD PROFILE — the full page for one word (overview, meanings, memory hook, sources).
+═══════════════════════════════════════════════════════════════ */
+.profile-hero { margin-bottom: 18px; }
+.profile-word { font-family: var(--font-head); font-size: 44px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); line-height: 1.1; }
+.profile-pos, .profile-pos-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--wash); font-size: 12px; font-weight: 600; color: var(--ink); }
+.profile-phonetic { font-size: 14px; color: var(--muted); }
+.profile-audio-btn { padding: 4px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--white); font-size: 13px; }
+.profile-audio-btn:hover { background: var(--wash); }
+.profile-tabs { display: flex; gap: 14px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+.profile-tab { padding: 8px 2px; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: var(--muted); font-size: 14px; font-weight: 500; }
+.profile-tab:hover { color: var(--ink); }
+.profile-tab.active { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+.profile-content { display: flex; flex-direction: column; gap: 12px; }
+.profile-main-def { font-size: 18px; color: var(--ink); }
+.profile-def-card, .profile-example-card, .nuance-card, .source-card, .sources-info-box, .highlight-card, .memory-card { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 14px 18px; }
+.highlight-card { background: var(--yellow-soft); border-color: transparent; }
+.memory-card { background: var(--paper); border-left: 3px solid var(--yellow); }
+.memory-text { font-style: italic; color: var(--ink); }
+.profile-def-text, .nuance-def { color: var(--ink); }
+.profile-def-example { margin-top: 6px; font-family: var(--font-read); font-style: italic; font-size: 13.5px; color: var(--muted); }
+.example-number { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; background: var(--yellow); font-size: 12px; font-weight: 700; align-items: center; justify-content: center; margin-right: 8px; }
+.nuance-word { font-weight: 600; color: var(--ink); }
+.related-chip { display: inline-flex; padding: 3px 12px; border-radius: 999px; background: var(--wash); font-size: 13px; cursor: pointer; border: none; margin: 0 6px 6px 0; }
+.related-chip:hover { background: var(--yellow-soft); }
+.section-title { font-size: 15px; font-weight: 600; color: var(--ink); font-family: var(--font-body); margin: 6px 0 2px; }
+.source-badge, .source-type-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--wash); font-size: 11px; font-weight: 600; }
+.source-link, .source-read-link { color: var(--ink); font-size: 13px; text-underline-offset: 3px; }
+.source-pipeline-row { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+.source-pipeline-icon { display: inline-flex; width: 28px; height: 28px; border-radius: var(--radius-sm); background: var(--yellow); align-items: center; justify-content: center; flex-shrink: 0; }
+.context-error { color: var(--danger); font-size: 14px; }
+.profile-loading-state { text-align: center; padding: 56px 0; color: var(--muted); }
+.danger-zone { margin-top: 28px; padding: 16px 18px; border: 1px solid var(--danger); border-radius: var(--radius-lg); background: var(--danger-soft); }
+.danger-zone-title { font-weight: 600; color: var(--danger); }
+.danger-zone-desc { font-size: 13.5px; color: var(--ink-2); margin: 4px 0 12px; }
+.empty-state { text-align: center; padding: 40px 20px; color: var(--muted); border: 1px dashed var(--line-strong); border-radius: var(--radius-lg); background: var(--paper); }
+.loading-dots { display: flex; justify-content: center; gap: 5px; padding: 24px 0; }
+.loading-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); opacity: 0.25; animation: pulse 1s infinite ease-in-out; }
+.loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+.loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+.page-container { width: 100%; max-width: 760px; margin: 0 auto; padding: 32px 28px 56px; }   /* WordProfile still uses the older container class name */
+.profile-def-card + .profile-def-card, .profile-example-card + .profile-example-card, .nuance-card + .nuance-card, .source-card + .source-card { margin-top: 10px; }
+.profile-main-def { margin: 14px 0 18px; }

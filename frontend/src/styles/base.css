@@ -1,0 +1,48 @@
+/* ═══════════════════════════════════════════════════════════════
+   BASE — browser reset, page background, default text and form fields.
+═══════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; }   /* width includes padding and border: far easier to reason about */
+* { margin: 0; }                                      /* remove the browser's default margins */
+
+html, body, #root { height: 100%; }                   /* lets the app frame fill the whole window */
+body {
+  background: var(--yellow);                          /* the yellow shows around the white panel as a thin frame */
+  color: var(--ink-2);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;                /* crisper text on Mac/iOS */
+}
+
+h1, h2, h3, h4 { font-family: var(--font-head); color: var(--ink); font-weight: 700; line-height: 1.15; }
+a { color: inherit; }
+button { font: inherit; color: inherit; cursor: pointer; }
+img, svg { display: block; max-width: 100%; }
+
+/* Form fields share one look everywhere */
+input, textarea, select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+input::placeholder, textarea::placeholder { color: var(--faint); }
+input:focus, textarea:focus, select:focus {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px rgba(244, 197, 66, 0.45);     /* a soft yellow glow shows which field is active */
+}
+
+/* Visible keyboard focus for buttons and links (accessibility) */
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* Thin, quiet scrollbars */
+* { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.25) transparent; }
+
+.sr-only {                                            /* text for screen readers only */
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}

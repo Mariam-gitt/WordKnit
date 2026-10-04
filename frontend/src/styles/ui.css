@@ -1,0 +1,118 @@
+/* ═══════════════════════════════════════════════════════════════
+   UI KIT STYLES — buttons, cards, chips, tabs, dialog, tooltip, popover, switch, states.
+   Used by the small components in src/components/ui/.
+═══════════════════════════════════════════════════════════════ */
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 38px; padding: 0 16px;
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 500; white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn--primary, .btn-primary { background: var(--ink); color: var(--yellow); }           /* black with yellow text: the brand button */
+.btn--primary:hover:not(:disabled), .btn-primary:hover:not(:disabled) { background: #2a2a2a; }
+.btn--secondary, .btn-secondary { background: var(--white); border-color: var(--line-strong); color: var(--ink); }
+.btn--secondary:hover:not(:disabled), .btn-secondary:hover:not(:disabled) { background: var(--wash); }
+.btn--ghost, .btn-ghost { background: transparent; color: var(--ink-2); }
+.btn--ghost:hover:not(:disabled), .btn-ghost:hover:not(:disabled) { background: var(--wash); }
+.btn--danger, .btn-danger { background: transparent; color: var(--danger); }
+.btn--danger:hover:not(:disabled), .btn-danger:hover:not(:disabled) { background: var(--danger-soft); }
+.btn--sm { height: 32px; padding: 0 12px; font-size: 13px; }
+.btn--block { width: 100%; }
+
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border: none; border-radius: var(--radius-sm);
+  background: transparent; color: var(--ink-2);
+  transition: background 0.12s ease;
+}
+.icon-btn:hover:not(:disabled) { background: var(--wash); }
+.icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.icon-btn.is-on { background: var(--yellow); color: var(--ink); }          /* a toggled-on tool */
+
+/* ── Cards and chips ── */
+.card { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px 18px; }
+.card--paper { background: var(--paper); }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 10px; border-radius: 999px; border: none;
+  font-size: 12px; font-weight: 600; background: var(--wash); color: var(--ink);
+}
+.chip--learned { background: var(--green); color: #fff; }
+.chip--yellow { background: var(--yellow-soft); }
+button.chip { cursor: pointer; }
+button.chip:hover { filter: brightness(0.96); }
+
+/* ── Stat cards ── */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.stat { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; }
+.stat-label { font-size: 13px; color: var(--muted); }
+.stat-value { font-family: var(--font-head); font-size: 28px; font-weight: 700; color: var(--ink); line-height: 1.15; margin-top: 2px; }
+.stat-value--green { color: var(--green); }
+
+/* ── Tabs (Radix): a soft segmented control, or plain underlined tabs ── */
+.tabs-list { display: flex; gap: 2px; padding: 3px; background: var(--wash); border-radius: var(--radius); }
+.tabs-trigger {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 7px 12px; border: none; border-radius: var(--radius-sm);
+  background: transparent; color: var(--muted); font-size: 13.5px; font-weight: 500; white-space: nowrap;
+}
+.tabs-trigger:hover { color: var(--ink); }
+.tabs-trigger[data-state="active"] { background: var(--ink); color: var(--yellow); }
+.tabs-count { font-size: 12px; opacity: 0.75; }
+.tabs-list--line { background: transparent; padding: 0; border-radius: 0; border-bottom: 1px solid var(--line); gap: 14px; }
+.tabs-list--line .tabs-trigger { flex: none; padding: 8px 2px; border-radius: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs-list--line .tabs-trigger[data-state="active"] { background: transparent; color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+
+/* ── Dialog (Radix) ── */
+.dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.38); z-index: 200; animation: fade-in 0.15s ease; }
+.dialog-content {
+  position: fixed; z-index: 201; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(620px, calc(100vw - 32px)); max-height: 82vh; display: flex; flex-direction: column;
+  background: var(--white); border-radius: var(--radius-lg); box-shadow: var(--shadow-pop);
+  animation: pop-in 0.16s ease;
+}
+.dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.dialog-title { font-family: var(--font-head); font-size: 20px; color: var(--ink); }
+.dialog-sub { font-size: 13px; color: var(--muted); margin-top: 3px; }
+.dialog-body { padding: 16px 20px 20px; overflow-y: auto; }
+.dialog-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* ── Tooltip and popover (Radix) ── */
+.tooltip { background: var(--ink); color: #fff; font-size: 12px; padding: 5px 9px; border-radius: 6px; z-index: 300; }
+.popover { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-pop); padding: 14px; width: 280px; z-index: 250; }
+
+/* ── Switch (Radix) ── */
+.switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; font-size: 14px; color: var(--ink); }
+.switch { width: 38px; height: 22px; border: none; border-radius: 999px; background: #cfcabb; position: relative; flex-shrink: 0; transition: background 0.15s ease; }
+.switch[data-state="checked"] { background: var(--ink); }
+.switch-thumb { display: block; width: 18px; height: 18px; border-radius: 50%; background: #fff; transform: translateX(2px); transition: transform 0.15s ease; }
+.switch[data-state="checked"] .switch-thumb { transform: translateX(18px); background: var(--yellow); }
+
+/* ── Fields ── */
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+.form-error { color: var(--danger); font-size: 13px; margin: 0 0 12px; }
+.note { font-size: 13px; color: var(--muted); }
+
+/* ── Empty and loading states ── */
+.empty { text-align: center; padding: 48px 24px; color: var(--muted); border: 1px dashed var(--line-strong); border-radius: var(--radius-lg); background: var(--paper); }
+.empty-icon { display: inline-flex; margin-bottom: 10px; color: var(--ink); }
+.empty p { font-size: 14px; }
+.empty .btn { margin-top: 14px; }
+
+.loading { display: flex; justify-content: center; gap: 5px; padding: 40px 0; }
+.loading span { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); opacity: 0.25; animation: pulse 1s infinite ease-in-out; }
+.loading span:nth-child(2) { animation-delay: 0.15s; }
+.loading span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes pulse { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop-in { from { opacity: 0; transform: translate(-50%, -48%); } to { opacity: 1; transform: translate(-50%, -50%); } }
+
+.tooltip--card { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; font-size: 12.5px; }
+.tooltip--card strong { font-size: 13px; }

@@ -1,0 +1,47 @@
+/* ═══════════════════════════════════════════════════════════════
+   SPEAKING PRACTICE — status chip, chat bubbles, word card, command chips and the big mic button.
+═══════════════════════════════════════════════════════════════ */
+.speak-bar { display: flex; align-items: center; gap: 4px; margin-bottom: 16px; }
+.speak-status { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px; border-radius: 999px; background: var(--wash); font-size: 13px; font-weight: 500; color: var(--ink-2); }
+.speak-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+.speak-status.is-listening { background: var(--green-soft); color: var(--green); }
+.speak-status.is-listening .speak-dot { background: var(--green); animation: pulse 1s infinite; }
+.speak-settings { max-height: 70vh; overflow-y: auto; }
+.speak-settings select, .speak-settings input[type="range"] { font-size: 13px; }
+.speak-start { margin-top: 8px; }
+.speak-words { margin-bottom: 8px; }
+
+.chat { display: flex; flex-direction: column; gap: 10px; min-height: 120px; max-height: 360px; overflow-y: auto; padding: 4px 2px; margin-bottom: 14px; }
+.bubble-row { display: flex; align-items: flex-end; gap: 8px; }
+.bubble-row--me { justify-content: flex-end; }
+.avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--yellow); color: var(--ink); font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.bubble { max-width: 80%; padding: 9px 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px 14px 14px 4px; font-family: var(--font-read); font-size: 14.5px; color: var(--ink); }  /* the coach speaks in the serif reading font */
+.bubble--me { background: var(--yellow-soft); border-color: transparent; border-radius: 14px 14px 4px 14px; font-family: var(--font-body); }
+.define-card { margin-left: 36px; padding: 12px 14px; background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); }
+.define-card p { font-size: 14px; margin-top: 4px; }
+.define-head { display: flex; align-items: center; gap: 8px; }
+.speak-hints { justify-content: center; margin-bottom: 18px; }
+.speak-hints .chip { font-weight: 500; color: var(--muted); }
+
+.mic-row { display: flex; align-items: center; justify-content: center; gap: 28px; margin-top: 6px; }
+.mic-caption { width: 110px; text-align: right; font-size: 13px; color: var(--muted); }
+.mic-row .btn { width: 110px; justify-content: flex-start; }
+.mic {
+  width: 72px; height: 72px; border-radius: 50%; border: none; background: var(--ink); color: var(--yellow);
+  display: inline-flex; align-items: center; justify-content: center; position: relative;
+  box-shadow: 0 0 0 6px var(--yellow-soft);                     /* the soft ring around the button */
+  transition: transform 0.12s ease, box-shadow 0.2s ease;
+}
+.mic:hover:not(:disabled) { transform: scale(1.04); }
+.mic:disabled { opacity: 0.5; cursor: not-allowed; }
+.mic.is-recording { background: var(--danger); color: #fff; box-shadow: 0 0 0 6px var(--danger-soft); animation: ring 1.4s infinite; }
+@keyframes ring { 0%, 100% { box-shadow: 0 0 0 6px var(--danger-soft); } 50% { box-shadow: 0 0 0 14px rgba(179, 38, 30, 0.10); } }
+
+.reflection { margin-top: 18px; }
+.reflection p { margin-top: 6px; }
+.session-row { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid var(--line); }
+.session-row:first-of-type { border-top: none; padding-top: 0; }
+.session-main { flex: 1; min-width: 0; cursor: pointer; }
+.session-main p:last-child { font-size: 14px; margin-top: 2px; }
+.session-detail { flex-basis: 100%; max-height: 220px; overflow-y: auto; padding: 8px 12px; background: var(--paper); border-radius: var(--radius-sm); font-size: 14px; }
+.session-detail p { margin: 4px 0; }
