@@ -35,7 +35,7 @@ const SIDEBAR_COLLAPSED_KEY = "wk-sidebar-collapsed";
  * behavior is ignored in favor of a simpler pattern: a top bar with a
  * hamburger button that opens the sidebar as a full slide-in drawer.
  */
-function GazetteShell({ children, rightSlot, reader, statusCount }) {
+function GazetteShell({ children, rightSlot, reader, statusCount, showBrand }) { // showBrand comes from AppLayout (parent → child)
     const navigate = useNavigate(); // lets nav buttons below actually change the page
     const location = useLocation(); // current URL path, used to highlight the active nav link
 
@@ -246,7 +246,17 @@ function GazetteShell({ children, rightSlot, reader, statusCount }) {
                 {/* Main content column: the actual page (Dashboard, Vocabulary, etc.),
                     plus the optional right-hand "aside" detail panel and its drag handle. */}
                 <div className={`app-body${rightSlot ? " has-aside" : ""}${reader ? " app-body--reader" : ""}`}>
-                    <main className="app-main">{children}</main>
+                    <main className="app-main">
+                        {/* NEW: the WordKnit name inside the page area itself. It shows when the sidebar is hidden
+                            (so the brand never disappears) or when a page asks for it with showBrand (the Dashboard does). */}
+                        {(collapsed || showBrand) && (
+                            <div className="app-main-brand">
+                                <YarnBallLogo size={24} />
+                                <span>WordKnit.</span>
+                            </div>
+                        )}
+                        {children}
+                    </main>
                     {rightSlot && (
                         <>
                             <div

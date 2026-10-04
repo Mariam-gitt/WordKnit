@@ -115,7 +115,7 @@ function WordList({ words, onStatusChange }) {
                         <div key={w._id} className={`word-card ${w.status === "learned" ? "learned" : ""}`}>
                             <div className="word-card-top">
                                 <h3 className="word-card-word-link" onClick={() => navigate(`/profile/${w.word}`)}>
-                                    {w.word} →
+                                    {w.word} {/* plain word: the arrow was removed for a cleaner look (click still opens the word profile) */}
                                 </h3>
                                 <div className="word-card-actions">
                                     <button
