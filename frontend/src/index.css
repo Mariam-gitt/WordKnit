@@ -3351,543 +3351,768 @@ input:focus {
    Warm yellow / paper conversation UI
 ═══════════════════════════════════════ */
 
+
+/* =========================================================
+   WORDKNIT — SPEAKING PRACTICE
+   Clean / warm / minimal
+   ========================================================= */
+
 [data-theme="gazette"] .speaking-page {
-  width: min(920px, 100%);
-  margin: 0 auto;
-  padding: 34px 28px 60px;
-  color: var(--ink);
+    --wk-paper: #fffdf7;
+    --wk-surface: #ffffff;
+    --wk-yellow: #fff3c4;
+    --wk-yellow-strong: #f1d98b;
+    --wk-yellow-soft: #fff8df;
+    --wk-brown: #51463b;
+    --wk-muted: #8d8174;
+    --wk-border: #e9dfca;
+    --wk-shadow: 0 10px 30px rgba(91, 73, 43, 0.07);
+
+    width: min(1180px, calc(100% - 48px));
+    height: calc(100dvh - 40px);
+    min-height: 620px;
+    margin: 0 auto;
+    padding: 20px 0 18px;
+
+    display: flex;
+    flex-direction: column;
+
+    color: var(--wk-brown);
+    overflow: hidden;
 }
 
-/* ───────── Header ───────── */
+
+/* =========================================================
+   HEADER
+   ========================================================= */
 
 [data-theme="gazette"] .speaking-header {
-  text-align: center;
-  margin-bottom: 30px;
+    flex-shrink: 0;
 }
 
 [data-theme="gazette"] .speaking-brand {
-  font-family: var(--heading);
-  font-size: 1.05rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  margin-bottom: 14px;
+    text-align: center;
+
+    font-family: "Space Mono", monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.28em;
+
+    color: var(--wk-brown);
 }
 
 [data-theme="gazette"] .speaking-header-line {
-  width: 100%;
-  height: 1px;
-  background: rgba(74, 57, 31, 0.28);
-  margin-bottom: 24px;
+    width: 100%;
+    height: 1px;
+    margin: 10px 0 16px;
+
+    background: var(--wk-border);
 }
 
-[data-theme="gazette"] .speaking-header h1 {
-  margin: 0;
-  font-family: var(--heading);
-  font-size: clamp(2rem, 4vw, 3rem);
-  line-height: 1.1;
-  font-weight: 700;
+[data-theme="gazette"] .speaking-heading-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
 }
 
-[data-theme="gazette"] .speaking-header p {
-  max-width: 580px;
-  margin: 12px auto 0;
-  color: var(--text-2);
-  font-size: 0.92rem;
-  line-height: 1.6;
+[data-theme="gazette"] .speaking-heading-row h1 {
+    margin: 0;
+
+    font-family: "Libre Baskerville", Georgia, serif;
+    font-size: clamp(25px, 3vw, 34px);
+    font-weight: 500;
+    letter-spacing: -0.025em;
+
+    color: var(--wk-brown);
 }
 
-/* ───────── Small buttons ───────── */
+[data-theme="gazette"] .speaking-heading-row p {
+    margin: 5px 0 0;
 
-[data-theme="gazette"] .speaking-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-bottom: 18px;
+    font-size: 13px;
+    line-height: 1.5;
+
+    color: var(--wk-muted);
 }
 
-[data-theme="gazette"] .speaking-small-btn {
-  border: 1px solid rgba(74, 57, 31, 0.16);
-  background: rgba(255, 255, 255, 0.58);
-  color: var(--ink);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-family: var(--body);
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: 0.15s ease;
+[data-theme="gazette"] .speaking-header-actions {
+    display: flex;
+    gap: 7px;
 }
 
-[data-theme="gazette"] .speaking-small-btn:hover {
-  background: #fff;
-  border-color: rgba(74, 57, 31, 0.28);
+[data-theme="gazette"] .speaking-icon-btn {
+    width: 34px;
+    height: 34px;
+
+    border: 1px solid var(--wk-border);
+    border-radius: 50%;
+
+    background: var(--wk-surface);
+    color: var(--wk-brown);
+
+    cursor: pointer;
+
+    transition:
+        background 160ms ease,
+        border-color 160ms ease,
+        transform 160ms ease;
 }
 
-/* ───────── Panels ───────── */
-
-[data-theme="gazette"] .speaking-panel {
-  background: #fffdf8;
-  border: 1px solid rgba(74, 57, 31, 0.14);
-  border-radius: 14px;
-  padding: 20px;
-  margin-bottom: 18px;
-  box-shadow: 0 4px 18px rgba(74, 57, 31, 0.05);
+[data-theme="gazette"] .speaking-icon-btn:hover {
+    background: var(--wk-yellow-soft);
+    border-color: var(--wk-yellow-strong);
+    transform: translateY(-1px);
 }
 
-[data-theme="gazette"] .speaking-panel-heading {
-  margin-bottom: 20px;
-}
 
-[data-theme="gazette"] .speaking-panel-heading h3 {
-  margin: 0;
-  font-family: var(--heading);
-  font-size: 1.15rem;
-}
-
-[data-theme="gazette"] .speaking-panel-heading span {
-  display: block;
-  margin-top: 4px;
-  color: var(--text-3);
-  font-size: 0.78rem;
-}
-
-[data-theme="gazette"] .speaking-history-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-/* ───────── Form fields ───────── */
-
-[data-theme="gazette"] .speaking-field {
-  display: block;
-  margin-bottom: 18px;
-}
-
-[data-theme="gazette"] .speaking-field > span {
-  display: block;
-  font-size: 0.82rem;
-  font-weight: 600;
-  margin-bottom: 7px;
-}
-
-[data-theme="gazette"] .speaking-field select {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid rgba(74, 57, 31, 0.18);
-  border-radius: 9px;
-  background: #fff;
-  color: var(--ink);
-  font-family: var(--body);
-}
-
-[data-theme="gazette"] .speaking-field small {
-  display: block;
-  margin-top: 5px;
-  color: var(--text-3);
-  font-size: 0.72rem;
-}
-
-[data-theme="gazette"] .speaking-field input[type="range"] {
-  width: 100%;
-}
-
-[data-theme="gazette"] .speaking-checkbox {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  margin-bottom: 18px;
-  font-size: 0.82rem;
-  line-height: 1.45;
-}
-
-/* ───────── Start card ───────── */
+/* =========================================================
+   START SCREEN
+   ========================================================= */
 
 [data-theme="gazette"] .speaking-start-card {
-  max-width: 620px;
-  margin: 42px auto;
-  padding: 42px 28px;
-  text-align: center;
-  background: #fffdf8;
-  border: 1px solid rgba(74, 57, 31, 0.14);
-  border-radius: 18px;
-  box-shadow: 0 8px 28px rgba(74, 57, 31, 0.07);
+    flex: 1;
+
+    min-height: 0;
+    margin-top: 20px;
+    padding: 34px;
+
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 24px;
+
+    border: 1px solid var(--wk-border);
+    border-radius: 20px;
+
+    background:
+        radial-gradient(
+            circle at 85% 20%,
+            rgba(241, 217, 139, 0.22),
+            transparent 28%
+        ),
+        var(--wk-surface);
+
+    box-shadow: var(--wk-shadow);
 }
 
-[data-theme="gazette"] .speaking-start-icon {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 18px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--mustard);
-  font-size: 1.7rem;
+[data-theme="gazette"] .speaking-start-mark {
+    width: 64px;
+    height: 64px;
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 50%;
+    background: var(--wk-yellow);
+
+    font-size: 30px;
+    color: var(--wk-brown);
+}
+
+[data-theme="gazette"] .speaking-eyebrow {
+    margin: 0 0 7px;
+
+    font-family: "Space Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+
+    color: var(--wk-muted);
 }
 
 [data-theme="gazette"] .speaking-start-card h2 {
-  margin: 0;
-  font-family: var(--heading);
-  font-size: 1.6rem;
+    margin: 0;
+
+    font-family: "Libre Baskerville", Georgia, serif;
+    font-size: 25px;
+    font-weight: 500;
 }
 
-[data-theme="gazette"] .speaking-start-card p {
-  max-width: 450px;
-  margin: 10px auto 24px;
-  color: var(--text-2);
-  line-height: 1.6;
+[data-theme="gazette"] .speaking-start-card p:not(.speaking-eyebrow) {
+    max-width: 480px;
+    margin: 7px 0 0;
+
+    font-size: 13px;
+    line-height: 1.6;
+
+    color: var(--wk-muted);
 }
 
 [data-theme="gazette"] .speaking-main-btn {
-  border: none;
-  border-radius: 10px;
-  padding: 13px 22px;
-  background: var(--ink);
-  color: var(--mustard);
-  font-family: var(--body);
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
+    padding: 12px 20px;
+
+    border: 0;
+    border-radius: 10px;
+
+    background: var(--wk-brown);
+    color: #fffdf7;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+        transform 160ms ease,
+        box-shadow 160ms ease;
 }
 
-/* ───────── Vocabulary ───────── */
-
-[data-theme="gazette"] .speaking-vocab-section {
-  margin-bottom: 28px;
+[data-theme="gazette"] .speaking-main-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 7px 18px rgba(81, 70, 59, 0.16);
 }
 
-[data-theme="gazette"] .speaking-section-label,
-[data-theme="gazette"] .vocab-note-label,
-[data-theme="gazette"] .speaking-feedback-label {
-  display: block;
-  margin-bottom: 5px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-3);
+[data-theme="gazette"] .speaking-main-btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
 }
 
-[data-theme="gazette"] .speaking-vocab-section p {
-  margin: 0 0 12px;
-  color: var(--text-2);
-  font-size: 0.82rem;
+
+/* =========================================================
+   ACTIVE SESSION
+   ========================================================= */
+
+[data-theme="gazette"] .speaking-session {
+    flex: 1;
+
+    min-height: 0;
+    margin-top: 16px;
+
+    display: flex;
+    flex-direction: column;
 }
 
-[data-theme="gazette"] .speaking-vocab-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 9px;
-}
 
-[data-theme="gazette"] .speaking-vocab-chip {
-  padding: 8px 13px;
-  border: 1px solid rgba(74, 57, 31, 0.14);
-  border-radius: 9px;
-  background: #fffdf8;
-  font-family: var(--heading);
-  font-size: 0.82rem;
-  box-shadow: 2px 3px 0 rgba(74, 57, 31, 0.05);
-}
-
-/* ───────── Chat ───────── */
+/* =========================================================
+   CHAT
+   ========================================================= */
 
 [data-theme="gazette"] .speaking-chat {
-  display: flex;
-  flex-direction: column;
-  gap: 17px;
-  min-height: 180px;
-  max-height: 470px;
-  overflow-y: auto;
-  padding: 8px 4px 18px;
+    flex: 1;
+
+    min-height: 0;
+    padding: 18px 22px;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 12px;
+
+    border: 1px solid var(--wk-border);
+    border-radius: 18px;
+
+    background: var(--wk-surface);
+
+    overflow-y: auto;
 }
 
 [data-theme="gazette"] .speaking-message {
-  display: flex;
-  flex-direction: column;
-  max-width: 78%;
+    max-width: 72%;
 }
 
 [data-theme="gazette"] .speaking-message-user {
-  align-self: flex-end;
-  align-items: flex-end;
+    align-self: flex-end;
+    text-align: right;
 }
 
 [data-theme="gazette"] .speaking-message-coach {
-  align-self: flex-start;
-  align-items: flex-start;
+    align-self: flex-start;
 }
 
 [data-theme="gazette"] .speaking-message-label {
-  margin: 0 10px 5px;
-  color: var(--text-3);
-  font-size: 0.68rem;
-  font-weight: 600;
+    display: block;
+    margin: 0 8px 4px;
+
+    font-family: "Space Mono", monospace;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+
+    color: var(--wk-muted);
 }
 
 [data-theme="gazette"] .speaking-bubble {
-  padding: 12px 16px;
-  border-radius: 16px;
-  font-size: 0.9rem;
-  line-height: 1.6;
-}
+    padding: 10px 14px;
 
-[data-theme="gazette"] .speaking-message-coach .speaking-bubble {
-  background: #fffdf8;
-  border: 1px solid rgba(74, 57, 31, 0.13);
-  border-top-left-radius: 5px;
+    border: 1px solid var(--wk-border);
+    border-radius: 15px;
+
+    background: var(--wk-yellow-soft);
+
+    font-size: 13px;
+    line-height: 1.55;
+
+    text-align: left;
 }
 
 [data-theme="gazette"] .speaking-message-user .speaking-bubble {
-  background: var(--mustard);
-  border: 1px solid rgba(74, 57, 31, 0.08);
-  border-top-right-radius: 5px;
+    background: var(--wk-yellow);
+    border-color: var(--wk-yellow-strong);
 }
 
 [data-theme="gazette"] .speaking-thinking {
-  color: var(--text-3);
-  font-style: italic;
+    color: var(--wk-muted);
 }
 
 [data-theme="gazette"] .speaking-thinking span {
-  animation: speaking-dot 1.2s infinite;
+    animation: wk-thinking 1.2s infinite;
 }
 
 [data-theme="gazette"] .speaking-thinking span:nth-child(2) {
-  animation-delay: 0.15s;
+    animation-delay: 0.15s;
 }
 
 [data-theme="gazette"] .speaking-thinking span:nth-child(3) {
-  animation-delay: 0.3s;
+    animation-delay: 0.3s;
 }
 
-@keyframes speaking-dot {
-  0%, 60%, 100% {
-    opacity: 0.25;
-  }
+@keyframes wk-thinking {
+    0%,
+    60%,
+    100% {
+        opacity: 0.2;
+    }
 
-  30% {
-    opacity: 1;
-  }
+    30% {
+        opacity: 1;
+    }
 }
 
-/* ───────── Microphone controls ───────── */
 
-[data-theme="gazette"] .speaking-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 20px;
+/* =========================================================
+   VOICE CONTROLS
+   ========================================================= */
+
+[data-theme="gazette"] .speaking-voice-area {
+    flex-shrink: 0;
+
+    padding: 12px 0 4px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
 }
 
 [data-theme="gazette"] .speaking-mic-btn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: none;
-  border-radius: 12px;
-  padding: 13px 20px;
-  background: var(--ink);
-  color: var(--mustard);
-  font-family: var(--body);
-  font-size: 0.88rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: 0.18s ease;
+    min-width: 180px;
+    height: 46px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+
+    border: 1px solid var(--wk-yellow-strong);
+    border-radius: 12px;
+
+    background: var(--wk-yellow);
+    color: var(--wk-brown);
+
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+        transform 160ms ease,
+        background 160ms ease,
+        box-shadow 160ms ease;
 }
 
-[data-theme="gazette"] .speaking-mic-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
+[data-theme="gazette"] .speaking-mic-btn:hover {
+    background: #ffedb0;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(91, 73, 43, 0.08);
 }
 
 [data-theme="gazette"] .speaking-mic-btn-recording {
-  background: #fffdf8;
-  color: var(--ink);
-  border: 1px solid rgba(74, 57, 31, 0.2);
-  box-shadow: 0 0 0 5px rgba(244, 197, 66, 0.18);
+    background: #f5df9c;
 }
 
 [data-theme="gazette"] .speaking-mic-icon {
-  font-size: 1rem;
+    font-size: 16px;
 }
 
 [data-theme="gazette"] .speaking-end-btn {
-  border: 1px solid rgba(74, 57, 31, 0.15);
-  border-radius: 10px;
-  padding: 12px 16px;
-  background: transparent;
-  color: var(--text-2);
-  font-family: var(--body);
-  font-size: 0.8rem;
-  cursor: pointer;
+    height: 46px;
+    padding: 0 16px;
+
+    border: 1px solid var(--wk-border);
+    border-radius: 12px;
+
+    background: var(--wk-surface);
+    color: var(--wk-muted);
+
+    font-size: 12px;
+
+    cursor: pointer;
 }
 
-/* ───────── Vocabulary note ───────── */
-
-[data-theme="gazette"] .vocab-note {
-  margin-bottom: 20px;
-  padding: 20px;
-  background: #fff9df;
-  border: 1px solid rgba(130, 98, 20, 0.16);
-  border-radius: 13px;
-  box-shadow: 3px 4px 0 rgba(130, 98, 20, 0.06);
+[data-theme="gazette"] .speaking-end-btn:hover {
+    color: var(--wk-brown);
+    border-color: var(--wk-yellow-strong);
 }
 
-[data-theme="gazette"] .vocab-note h3 {
-  margin: 0 0 8px;
-  font-family: var(--heading);
-  font-size: 1.4rem;
+[data-theme="gazette"] .speaking-end-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
-[data-theme="gazette"] .vocab-note p {
-  margin: 6px 0;
-  line-height: 1.55;
+
+/* =========================================================
+   VOICE COMMANDS
+   ========================================================= */
+
+[data-theme="gazette"] .speaking-commands {
+    flex-shrink: 0;
+
+    padding: 6px 0 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+
+    font-size: 11px;
 }
 
-[data-theme="gazette"] .vocab-example {
-  color: var(--text-2);
-  font-style: italic;
+[data-theme="gazette"] .speaking-commands-title {
+    font-weight: 600;
+    color: var(--wk-brown);
 }
 
-/* ───────── Feedback ───────── */
+[data-theme="gazette"] .speaking-command-list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px 12px;
 
+    color: var(--wk-muted);
+}
+
+[data-theme="gazette"] .speaking-command-list span {
+    white-space: nowrap;
+}
+
+
+/* =========================================================
+   DEFINITION / FEEDBACK
+   ========================================================= */
+
+[data-theme="gazette"] .speaking-definition,
 [data-theme="gazette"] .speaking-feedback {
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  align-items: flex-start;
-  margin-bottom: 20px;
-  padding: 20px;
-  background: #fff9df;
-  border: 1px solid rgba(130, 98, 20, 0.16);
-  border-radius: 13px;
+    flex-shrink: 0;
+
+    margin-top: 12px;
+    padding: 12px 15px;
+
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
+    border: 1px solid var(--wk-border);
+    border-radius: 12px;
+
+    background: var(--wk-yellow-soft);
 }
 
-[data-theme="gazette"] .speaking-feedback h3 {
-  margin: 0 0 6px;
-  font-family: var(--heading);
+[data-theme="gazette"] .speaking-definition > div,
+[data-theme="gazette"] .speaking-feedback > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
+[data-theme="gazette"] .speaking-definition span,
+[data-theme="gazette"] .speaking-feedback span {
+    font-family: "Space Mono", monospace;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--wk-muted);
+}
+
+[data-theme="gazette"] .speaking-definition strong {
+    font-size: 14px;
+}
+
+[data-theme="gazette"] .speaking-definition p,
 [data-theme="gazette"] .speaking-feedback p {
-  margin: 0;
-  line-height: 1.55;
+    flex: 1;
+    margin: 0;
+
+    font-size: 12px;
+    line-height: 1.45;
 }
 
-/* ───────── History ───────── */
+[data-theme="gazette"] .speaking-definition em {
+    max-width: 280px;
+
+    font-size: 11px;
+    color: var(--wk-muted);
+}
+
+
+/* =========================================================
+   BUTTONS / PANELS
+   ========================================================= */
+
+[data-theme="gazette"] .speaking-text-btn,
+[data-theme="gazette"] .speaking-close-btn {
+    border: 0;
+    background: transparent;
+    color: var(--wk-muted);
+
+    cursor: pointer;
+}
+
+[data-theme="gazette"] .speaking-text-btn:hover,
+[data-theme="gazette"] .speaking-close-btn:hover {
+    color: var(--wk-brown);
+}
+
+[data-theme="gazette"] .speaking-close-btn {
+    font-size: 22px;
+}
+
+[data-theme="gazette"] .speaking-overlay-panel {
+    position: absolute;
+    z-index: 20;
+
+    top: 88px;
+    right: 24px;
+
+    width: min(390px, calc(100% - 48px));
+    max-height: calc(100dvh - 130px);
+
+    padding: 18px;
+
+    overflow-y: auto;
+
+    border: 1px solid var(--wk-border);
+    border-radius: 16px;
+
+    background: rgba(255, 253, 247, 0.98);
+    box-shadow: 0 18px 45px rgba(73, 63, 53, 0.14);
+}
+
+[data-theme="gazette"] .speaking-panel-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+
+    margin-bottom: 18px;
+}
+
+[data-theme="gazette"] .speaking-panel-heading h3 {
+    margin: 0;
+
+    font-family: "Libre Baskerville", Georgia, serif;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+[data-theme="gazette"] .speaking-panel-heading span {
+    display: block;
+    margin-top: 3px;
+
+    font-size: 11px;
+    color: var(--wk-muted);
+}
+
+[data-theme="gazette"] .speaking-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    margin-bottom: 14px;
+
+    font-size: 12px;
+}
+
+[data-theme="gazette"] .speaking-field > span {
+    font-weight: 600;
+}
+
+[data-theme="gazette"] .speaking-field select {
+    height: 36px;
+
+    padding: 0 10px;
+
+    border: 1px solid var(--wk-border);
+    border-radius: 8px;
+
+    background: white;
+    color: var(--wk-brown);
+}
+
+[data-theme="gazette"] .speaking-field small {
+    color: var(--wk-muted);
+}
+
+[data-theme="gazette"] .speaking-checkbox {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+
+    margin: 14px 0;
+
+    font-size: 12px;
+    line-height: 1.4;
+}
 
 [data-theme="gazette"] .speaking-history-item {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 13px 0;
-  border-top: 1px solid rgba(74, 57, 31, 0.09);
+    position: relative;
+
+    padding: 11px 0;
+
+    border-top: 1px solid var(--wk-border);
 }
 
 [data-theme="gazette"] .speaking-history-content {
-  flex: 1;
-  min-width: 200px;
-  cursor: pointer;
+    cursor: pointer;
 }
 
 [data-theme="gazette"] .speaking-history-content small {
-  color: var(--text-3);
-  font-size: 0.7rem;
+    color: var(--wk-muted);
+    font-size: 10px;
 }
 
 [data-theme="gazette"] .speaking-history-content p {
-  margin: 4px 0 0;
-  font-size: 0.84rem;
+    margin: 4px 45px 0 0;
+
+    font-size: 12px;
 }
 
 [data-theme="gazette"] .speaking-delete-btn {
-  border: none;
-  background: transparent;
-  color: var(--text-3);
-  cursor: pointer;
-  font-size: 0.74rem;
-}
+    position: absolute;
+    top: 12px;
+    right: 0;
 
-[data-theme="gazette"] .speaking-delete-btn:hover {
-  color: var(--ink);
+    border: 0;
+    background: transparent;
+
+    color: #a47d65;
+    font-size: 10px;
+
+    cursor: pointer;
 }
 
 [data-theme="gazette"] .speaking-history-detail {
-  width: 100%;
-  margin-top: 4px;
-  padding: 12px;
-  background: #f8f3e7;
-  border-radius: 9px;
-  max-height: 220px;
-  overflow-y: auto;
-}
+    margin-top: 10px;
+    padding: 10px;
 
-[data-theme="gazette"] .speaking-history-detail p {
-  margin: 5px 0;
-  font-size: 0.78rem;
-  line-height: 1.5;
-}
+    border-radius: 9px;
+    background: var(--wk-yellow-soft);
 
-[data-theme="gazette"] .speaking-feedback-text {
-  font-style: italic;
-}
-
-/* ───────── Misc ───────── */
-
-[data-theme="gazette"] .speaking-alert,
-[data-theme="gazette"] .speaking-error {
-  color: #7b2f20;
-}
-
-[data-theme="gazette"] .speaking-alert {
-  padding: 14px;
-  background: #fff9df;
-  border: 1px solid rgba(130, 98, 20, 0.18);
-  border-radius: 10px;
-}
-
-[data-theme="gazette"] .speaking-error {
-  font-size: 0.8rem;
+    font-size: 11px;
+    line-height: 1.5;
 }
 
 [data-theme="gazette"] .speaking-muted {
-  color: var(--text-3);
-  font-size: 0.82rem;
+    margin: 0;
+
+    color: var(--wk-muted);
+    font-size: 12px;
 }
 
-[data-theme="gazette"] .speaking-command-hint {
-  margin: 12px 0 0;
-  text-align: center;
-  color: var(--text-3);
-  font-size: 0.7rem;
+
+/* =========================================================
+   ALERTS
+   ========================================================= */
+
+[data-theme="gazette"] .speaking-alert,
+[data-theme="gazette"] .speaking-error {
+    flex-shrink: 0;
+
+    margin-top: 10px;
+    padding: 9px 12px;
+
+    border-radius: 9px;
+
+    background: #fff4ed;
+    color: #8b604d;
+
+    font-size: 11px;
 }
 
-/* ───────── Mobile ───────── */
+[data-theme="gazette"] .speaking-start-error {
+    text-align: center;
+}
 
-@media (max-width: 640px) {
-  [data-theme="gazette"] .speaking-page {
-    padding: 24px 16px 40px;
-  }
 
-  [data-theme="gazette"] .speaking-toolbar {
-    justify-content: flex-start;
-  }
+/* =========================================================
+   SMALL SCREENS
+   ========================================================= */
 
-  [data-theme="gazette"] .speaking-message {
-    max-width: 88%;
-  }
+@media (max-width: 760px) {
+    [data-theme="gazette"] .speaking-page {
+        width: min(100% - 24px, 680px);
+        height: auto;
+        min-height: calc(100dvh - 24px);
+        overflow: visible;
+    }
 
-  [data-theme="gazette"] .speaking-controls {
-    flex-direction: column;
-  }
+    [data-theme="gazette"] .speaking-heading-row {
+        align-items: flex-start;
+    }
 
-  [data-theme="gazette"] .speaking-mic-btn,
-  [data-theme="gazette"] .speaking-end-btn {
-    width: 100%;
-    justify-content: center;
-  }
+    [data-theme="gazette"] .speaking-start-card {
+        grid-template-columns: 1fr;
+        text-align: center;
+        padding: 28px 20px;
+    }
 
-  [data-theme="gazette"] .speaking-feedback {
-    flex-direction: column;
-  }
+    [data-theme="gazette"] .speaking-start-card p:not(.speaking-eyebrow) {
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    [data-theme="gazette"] .speaking-start-mark {
+        margin: 0 auto;
+    }
+
+    [data-theme="gazette"] .speaking-main-btn {
+        justify-self: center;
+    }
+
+    [data-theme="gazette"] .speaking-message {
+        max-width: 86%;
+    }
+
+    [data-theme="gazette"] .speaking-commands {
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    [data-theme="gazette"] .speaking-definition,
+    [data-theme="gazette"] .speaking-feedback {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
+
+@media (max-height: 700px) and (min-width: 761px) {
+    [data-theme="gazette"] .speaking-page {
+        padding-top: 12px;
+        padding-bottom: 10px;
+    }
+
+    [data-theme="gazette"] .speaking-heading-row p {
+        display: none;
+    }
+
+    [data-theme="gazette"] .speaking-chat {
+        padding: 12px 18px;
+    }
+
+    [data-theme="gazette"] .speaking-bubble {
+        padding: 8px 12px;
+    }
+
+    [data-theme="gazette"] .speaking-voice-area {
+        padding-top: 8px;
+    }
 }
