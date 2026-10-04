@@ -452,52 +452,62 @@ function SpeakingPractice() {
     const micSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
 
 
-      return (
-    <AppLayout>
-        <div className="speaking-page">
 
-            {/* WordKnit centered page header */}
+return (
+    <AppLayout>
+        <main className="speaking-page">
+            {/* ── PAGE HEADER ── */}
             <header className="speaking-header">
                 <div className="speaking-brand">WORDKNIT</div>
+
                 <div className="speaking-header-line" />
-                <h1>Speaking Practice</h1>
-                <p>
-                    Practice speaking naturally with your AI coach.
-                    Your saved vocabulary can become part of the conversation.
-                </p>
+
+                <div className="speaking-heading-row">
+                    <div>
+                        <h1>Speaking Practice</h1>
+                        <p>
+                            Speak naturally. Your coach will listen, respond,
+                            and help you improve.
+                        </p>
+                    </div>
+
+                    <div className="speaking-header-actions">
+                        <button
+                            className="speaking-icon-btn"
+                            onClick={() => setShowSettings((v) => !v)}
+                            aria-label="Speaking settings"
+                            title="Settings"
+                        >
+                            ⚙
+                        </button>
+
+                        <button
+                            className="speaking-icon-btn"
+                            onClick={toggleHistory}
+                            aria-label="Speaking history"
+                            title="History"
+                        >
+                            ↺
+                        </button>
+                    </div>
+                </div>
             </header>
 
-            {!micSupported && (
-                <div className="speaking-alert">
-                    Your browser doesn't support audio recording.
-                    Try Chrome or Edge.
-                </div>
-            )}
-
-            {micSupported && (
-                <div className="speaking-toolbar">
-                    <button
-                        className="speaking-small-btn"
-                        onClick={() => setShowSettings((v) => !v)}
-                    >
-                        ⚙️ Settings
-                    </button>
-
-                    <button
-                        className="speaking-small-btn"
-                        onClick={toggleHistory}
-                    >
-                        🕒 History
-                    </button>
-                </div>
-            )}
-
-            {/* Settings */}
+            {/* ── SETTINGS ── */}
             {showSettings && (
-                <div className="speaking-panel">
+                <div className="speaking-overlay-panel">
                     <div className="speaking-panel-heading">
-                        <h3>Speaking settings</h3>
-                        <span>Personalize your practice</span>
+                        <div>
+                            <h3>Speaking settings</h3>
+                            <span>Personalize your practice</span>
+                        </div>
+
+                        <button
+                            className="speaking-close-btn"
+                            onClick={() => setShowSettings(false)}
+                        >
+                            ×
+                        </button>
                     </div>
 
                     <label className="speaking-field">
@@ -508,7 +518,9 @@ function SpeakingPractice() {
                             onChange={(e) => changeLevel(e.target.value)}
                             disabled={!levelLoaded}
                         >
-                            {!levelLoaded && <option value="">Loading…</option>}
+                            {!levelLoaded && (
+                                <option value="">Loading…</option>
+                            )}
 
                             {LEVEL_OPTIONS.map((opt) => (
                                 <option key={opt.value} value={opt.value}>
@@ -535,7 +547,7 @@ function SpeakingPractice() {
                         />
 
                         <span>
-                            Listen for “WordKnit” to start each turn hands-free.
+                            Listen for “WordKnit” to start hands-free.
                         </span>
                     </label>
 
@@ -604,24 +616,31 @@ function SpeakingPractice() {
                 </div>
             )}
 
-            {/* History */}
+            {/* ── HISTORY ── */}
             {showHistory && (
-                <div className="speaking-panel">
-                    <div className="speaking-panel-heading speaking-history-heading">
+                <div className="speaking-overlay-panel speaking-history-panel">
+                    <div className="speaking-panel-heading">
                         <div>
                             <h3>Past conversations</h3>
                             <span>Your previous speaking sessions</span>
                         </div>
 
-                        {sessions.length > 0 && (
-                            <button
-                                className="speaking-small-btn"
-                                onClick={clearAllSessions}
-                            >
-                                Clear all
-                            </button>
-                        )}
+                        <button
+                            className="speaking-close-btn"
+                            onClick={() => setShowHistory(false)}
+                        >
+                            ×
+                        </button>
                     </div>
+
+                    {sessions.length > 0 && (
+                        <button
+                            className="speaking-text-btn"
+                            onClick={clearAllSessions}
+                        >
+                            Clear all
+                        </button>
+                    )}
 
                     {isLoadingSessions && (
                         <p className="speaking-muted">Loading…</p>
@@ -635,13 +654,18 @@ function SpeakingPractice() {
 
                     {!isLoadingSessions &&
                         sessions.map((s) => (
-                            <div className="speaking-history-item" key={s.id}>
+                            <div
+                                className="speaking-history-item"
+                                key={s.id}
+                            >
                                 <div
                                     className="speaking-history-content"
                                     onClick={() => viewSessionDetail(s.id)}
                                 >
                                     <small>
-                                        {new Date(s.startedAt).toLocaleString()}
+                                        {new Date(
+                                            s.startedAt
+                                        ).toLocaleString()}
                                         {" · "}
                                         {s.messageCount} messages
                                         {" · "}
@@ -675,9 +699,11 @@ function SpeakingPractice() {
                                         )}
 
                                         {openSessionDetail.reflection && (
-                                            <p className="speaking-feedback-text">
-                                                Feedback:{" "}
-                                                {openSessionDetail.reflection}
+                                            <p>
+                                                <strong>Feedback:</strong>{" "}
+                                                {
+                                                    openSessionDetail.reflection
+                                                }
                                             </p>
                                         )}
                                     </div>
@@ -687,40 +713,44 @@ function SpeakingPractice() {
                 </div>
             )}
 
-            {/* Definition card */}
-            {currentDefinition && (
-                <div className="vocab-note">
-                    <div className="vocab-note-label">Vocabulary note</div>
+            {/* ── BROWSER SUPPORT ── */}
+            {!micSupported && (
+                <div className="speaking-alert">
+                    Your browser doesn't support audio recording.
+                    Try Chrome or Edge.
+                </div>
+            )}
 
-                    <h3>{currentDefinition.word}</h3>
+            {/* ── DEFINITION ── */}
+            {currentDefinition && (
+                <div className="speaking-definition">
+                    <div>
+                        <span>Definition</span>
+                        <strong>{currentDefinition.word}</strong>
+                    </div>
 
                     <p>{currentDefinition.meaning}</p>
 
                     {currentDefinition.exampleSentence &&
                         currentDefinition.exampleSentence !==
                             "No example available" && (
-                            <p className="vocab-example">
+                            <em>
                                 “{currentDefinition.exampleSentence}”
-                            </p>
+                            </em>
                         )}
                 </div>
             )}
 
-            {/* Feedback */}
+            {/* ── FEEDBACK ── */}
             {reflection && (
                 <div className="speaking-feedback">
                     <div>
-                        <span className="speaking-feedback-label">
-                            Session reflection
-                        </span>
-
-                        <h3>Nice work today.</h3>
-
+                        <span>Session reflection</span>
                         <p>{reflection}</p>
                     </div>
 
                     <button
-                        className="speaking-small-btn"
+                        className="speaking-text-btn"
                         onClick={() => setReflection(null)}
                     >
                         Dismiss
@@ -728,17 +758,25 @@ function SpeakingPractice() {
                 </div>
             )}
 
-            {/* Start screen */}
+            {/* ── START STATE ── */}
             {micSupported && !hasStarted && (
                 <section className="speaking-start-card">
-                    <div className="speaking-start-icon">🎙️</div>
+                    <div className="speaking-start-mark">
+                        <span>◌</span>
+                    </div>
 
-                    <h2>Ready to practise?</h2>
+                    <div>
+                        <p className="speaking-eyebrow">
+                            SPEAKING SESSION
+                        </p>
 
-                    <p>
-                        Start a conversation and talk naturally.
-                        Your coach will respond out loud.
-                    </p>
+                        <h2>Ready to practise?</h2>
+
+                        <p>
+                            Start a conversation and speak naturally.
+                            You don't need a script.
+                        </p>
+                    </div>
 
                     <button
                         className="speaking-main-btn"
@@ -747,47 +785,18 @@ function SpeakingPractice() {
                     >
                         {isProcessing
                             ? "Starting…"
-                            : "Start Conversation"}
+                            : "Start conversation"}
                     </button>
                 </section>
             )}
 
-            {micSupported && errorMsg && !hasStarted && (
-                <p className="speaking-error">{errorMsg}</p>
-            )}
-
-            {/* Active conversation */}
+            {/* ── ACTIVE SESSION ── */}
             {micSupported && hasStarted && (
                 <section className="speaking-session">
 
-                    {/* Vocabulary */}
-                    {vocabWords.length > 0 && (
-                        <div className="speaking-vocab-section">
-                            <div>
-                                <span className="speaking-section-label">
-                                    Today's vocabulary
-                                </span>
+                    {/* We intentionally DO NOT show vocabWords here.
+                        The learner should recall the vocabulary themselves. */}
 
-                                <p>
-                                    Try using these naturally during the
-                                    conversation.
-                                </p>
-                            </div>
-
-                            <div className="speaking-vocab-list">
-                                {vocabWords.map((word) => (
-                                    <span
-                                        className="speaking-vocab-chip"
-                                        key={word}
-                                    >
-                                        {word}
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Conversation */}
                     <div className="speaking-chat">
                         {conversation.map((turn, i) => (
                             <div
@@ -799,7 +808,9 @@ function SpeakingPractice() {
                                 }`}
                             >
                                 <span className="speaking-message-label">
-                                    {turn.role === "user" ? "You" : "Coach"}
+                                    {turn.role === "user"
+                                        ? "You"
+                                        : "Coach"}
                                 </span>
 
                                 <div className="speaking-bubble">
@@ -815,7 +826,10 @@ function SpeakingPractice() {
                                 </span>
 
                                 <div className="speaking-bubble speaking-thinking">
-                                    Thinking<span>.</span><span>.</span><span>.</span>
+                                    Thinking
+                                    <span>.</span>
+                                    <span>.</span>
+                                    <span>.</span>
                                 </div>
                             </div>
                         )}
@@ -825,9 +839,8 @@ function SpeakingPractice() {
                         <p className="speaking-error">{errorMsg}</p>
                     )}
 
-                    {/* Controls */}
-                    <div className="speaking-controls">
-
+                    {/* ── VOICE AREA ── */}
+                    <div className="speaking-voice-area">
                         <button
                             className={`speaking-mic-btn ${
                                 isRecording
@@ -846,15 +859,15 @@ function SpeakingPractice() {
                                     ? "✦"
                                     : isRecording
                                     ? "■"
-                                    : "🎙️"}
+                                    : "⌕"}
                             </span>
 
-                            <span>
+                            <span className="speaking-mic-text">
                                 {isProcessing
                                     ? "Thinking…"
                                     : isRecording
-                                    ? "Stop & Send"
-                                    : "Tap to Talk"}
+                                    ? "Stop & send"
+                                    : "Tap to talk"}
                             </span>
                         </button>
 
@@ -869,17 +882,33 @@ function SpeakingPractice() {
                         >
                             {isEndingSession
                                 ? "Wrapping up…"
-                                : "End Session"}
+                                : "End session"}
                         </button>
                     </div>
 
-                    <p className="speaking-command-hint">
-                        You can also say “define a word”, “add it”,
-                        “spell it”, “synonyms”, or “repeat”.
-                    </p>
+                    {/* ── VOICE COMMANDS ── */}
+                    <div className="speaking-commands">
+                        <div className="speaking-commands-title">
+                            Voice shortcuts
+                        </div>
+
+                        <div className="speaking-command-list">
+                            <span>“Define a word”</span>
+                            <span>“Add it”</span>
+                            <span>“Repeat”</span>
+                            <span>“Spell it”</span>
+                            <span>“Synonyms”</span>
+                        </div>
+                    </div>
                 </section>
             )}
-        </div>
+
+            {micSupported && errorMsg && !hasStarted && (
+                <p className="speaking-error speaking-start-error">
+                    {errorMsg}
+                </p>
+            )}
+        </main>
     </AppLayout>
 );
     
