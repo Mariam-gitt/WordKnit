@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../api";
 import AppLayout from "../components/AppLayout";
 import AddWord from "../components/AddWord";
+import { TbMicrophone, TbFileSearch, TbX } from "react-icons/tb"; // NEW: clean line icons used on the action tiles and the close buttons
 
 function Dashboard() {
     const navigate = useNavigate();
@@ -16,7 +17,20 @@ function Dashboard() {
     const [diffStats, setDiffStats]           = useState(null);
     const [diffTruncated, setDiffTruncated]   = useState(false);
 
+    const [diffOpen, setDiffOpen]           = useState(false); // NEW: is the "difficult words" pop-up open? (results open in a pop-up so the page never grows taller)
+
     const diffRef = useRef();
+
+    // NEW: pressing Escape closes whichever pop-up is open (a standard expectation for pop-ups)
+    useEffect(() => {
+        const onKey = (e) => {                                   // runs on every key press while this page is open
+            if (e.key !== "Escape") return;                      // ignore every key except Escape
+            setDiffOpen(false);                                  // close the difficult-words pop-up
+            if (!loadingProfile) setNewWordProfile(null);        // close the word-profile pop-up (but not while it is still loading)
+        };
+        window.addEventListener("keydown", onKey);               // start listening
+        return () => window.removeEventListener("keydown", onKey); // stop listening when leaving the page (clean-up)
+    }, [loadingProfile]);
 
     const fetchWords = async () => { try { const r = await api.get("/words"); setWords(r.data); } catch {} };
     useEffect(() => { fetchWords(); }, []);
@@ -47,6 +61,7 @@ function Dashboard() {
             setDiffWords(found);
             setDiffStats(r.data.pdfStats || null);
             setDiffTruncated(!!r.data.truncated);
+            if (found.length) setDiffOpen(true);                  // NEW: show the results in the pop-up
             if (!found.length) setDiffMsg("No difficult words found — try a longer academic PDF.");
         } catch (err) {
             setDiffMsg(err.response?.data?.message || "Analysis failed. Make sure the PDF has selectable text (not a scanned image).");
@@ -74,8 +89,9 @@ function Dashboard() {
     const learnedCount = words.filter(w => w.status === "learned").length;
 
     return (
-        <AppLayout statusCount={words.length}>
-                <div className="page-container">
+        // showBrand: asks the layout to show the WordKnit name at the top of this page, not only in the sidebar (parent → child prop)
+        <AppLayout statusCount={words.length} showBrand>
+                <div className="page-container page-container--compact">
 
                     <div className="page-header">
                         <h1>Dashboard</h1>
@@ -86,7 +102,7 @@ function Dashboard() {
                     <div className="stats-row">
                         <div className="stat-card">
                             <div className="stat-number">{words.length}</div>
-                            <div className="stat-label">Total Words</div>
+                            <div className="stat-label">Total words</div>
                         </div>
                         <div className="stat-card">
                             <div className="stat-number" style={{ color: "var(--green)" }}>{learnedCount}</div>
@@ -94,32 +110,31 @@ function Dashboard() {
                         </div>
                         <div className="stat-card">
                             <div className="stat-number">{words.length - learnedCount}</div>
-                            <div className="stat-label">To Review</div>
+                            <div className="stat-label">To review</div>
                         </div>
                     </div>
 
-                    <AddWord onWordAdded={handleWordAdded} />
-
-                    {/* ── Quick actions row: Upload PDF + Speaking Coach, side by side
-                         right under the Add box (matches the compact pill-button
-                         layout from the reference design, instead of one big
-                         full-width button on its own line). ── */}
-                    <div className="dashboard-quick-actions">
-                        <button
-                            className="pill-btn"
-                            onClick={() => diffRef.current.click()}
-                            disabled={diffAnalyzing}
-                        >
-                            {diffAnalyzing
-                                ? <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                    <span className="loading-dots" style={{ display: "inline-flex", gap: "3px" }}><span/><span/><span/></span>
-                                    Analysing…
-                                  </span>
-                                : <>📄 Upload PDF</>
-                            }
+                    {/* NEW: one row with everything you do most — add a word, speaking practice, difficult words.
+                        AddWord (child) tells this page (parent) about a new word through the onWordAdded callback (child → parent). */}
+                    <div className="dashboard-actions">
+                        <AddWord onWordAdded={handleWordAdded} />
+                        <button className="action-tile" onClick={() => navigate("/speaking")}>
+                            <span className="action-tile-icon"><TbMicrophone size={18} /></span>
+                            <span>
+                                <span className="action-tile-title">Speaking</span>
+                                <span className="action-tile-sub">Talk to the coach</span>
+                            </span>
                         </button>
-                        <button className="pill-btn" onClick={() => navigate("/speaking")}>
-                            🎤 Speaking Coach
+                        <button
+                            className="action-tile"
+                            onClick={() => diffRef.current.click()}   // opens the hidden file picker below
+                            disabled={diffAnalyzing}                  // greyed out while a PDF is being analysed
+                        >
+                            <span className="action-tile-icon"><TbFileSearch size={18} /></span>
+                            <span>
+                                <span className="action-tile-title">Difficult words</span>
+                                <span className="action-tile-sub">{diffAnalyzing ? "Analysing…" : "Scan a PDF"}</span>
+                            </span>
                         </button>
                     </div>
                     <input
@@ -130,120 +145,20 @@ function Dashboard() {
                         onChange={handleDifficultyAnalyze}
                     />
 
-                    {/* ── Difficult Words Detector results (only appears once a PDF
-                         has actually been analyzed via the "Upload PDF" pill above) ── */}
-                    <div style={{ marginBottom: "28px" }}>
-                        {diffMsg && (
-                            <div style={{
-                                padding: "10px 14px",
-                                border: "1px solid var(--border)",
-                                background: "var(--card)",
-                                fontSize: "0.84rem",
-                                color: "var(--text-2)",
-                                marginBottom: "8px"
-                            }}>
-                                {diffMsg}
-                            </div>
-                        )}
+                    {/* Short message after a scan (for example "No difficult words found") */}
+                    {diffMsg && <p className="dashboard-note">{diffMsg}</p>}
 
-                        {diffWords.length > 0 && (
-                            <div className="difficult-panel">
-                                <div className="difficult-panel-header">
-                                    <div>
-                                        <h3>🔍 {diffWords.length} difficult words found</h3>
-                                        {diffStats && (
-                                            <p style={{ fontSize: "0.72rem", color: "var(--text-3)", marginTop: "3px" }}>
-                                                {diffStats.pages > 0 ? `${diffStats.pages} pages · ` : ""}
-                                                {diffStats.totalTokens?.toLocaleString()} tokens · {diffStats.uniqueWords?.toLocaleString()} unique words scanned
-                                            </p>
-                                        )}
-                                        {diffTruncated && diffStats && (
-                                            <p style={{ fontSize: "0.72rem", color: "var(--accent)", marginTop: "3px" }}>
-                                                ⚠ Large PDF — only analyzed the first {diffStats.pagesAnalyzed} of {diffStats.pages} pages
-                                            </p>
-                                        )}
-                                    </div>
-                                    <button
-                                        className="btn btn-primary btn-sm"
-                                        style={{ width: "auto" }}
-                                        onClick={addAllDiffWords}
-                                    >
-                                        + Add All
-                                    </button>
-                                </div>
-                                <div className="difficult-panel-body">
-                                    <p style={{ fontSize: "0.75rem", color: "var(--text-3)", marginBottom: "12px" }}>
-                                        Ranked by difficulty — length, academic patterns, rarity in this document.
-                                        Click a word to add it to your vocabulary.
-                                    </p>
-                                    {diffWords.map(w => (
-                                        <span
-                                            key={w}
-                                            className={`difficult-word-chip ${diffAdded.has(w) ? "added" : ""}`}
-                                            onClick={() => !diffAdded.has(w) && addDifficultWord(w)}
-                                        >
-                                            {w}
-                                            <span className="chip-badge">
-                                                {diffAdded.has(w) ? "✓" : "+ Add"}
-                                            </span>
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Inline word profile preview */}
-                    {loadingProfile && (
-                        <div style={{
-                            border: "2px dashed var(--border)", padding: "28px",
-                            textAlign: "center", background: "var(--card)", marginBottom: "26px"
-                        }}>
-                            <div className="loading-dots"><span/><span/><span/></div>
-                            <p style={{ color: "var(--text-2)", marginTop: "10px", fontSize: "0.82rem" }}>
-                                Building word profile…
-                            </p>
-                        </div>
-                    )}
-
-                    {newWordProfile && !loadingProfile && (
-                        <div className="word-profile-inline">
-                            <div className="word-profile-inline-header">
-                                <h3>{newWordProfile.word}</h3>
-                                <button className="word-profile-inline-close" onClick={() => setNewWordProfile(null)}>✕</button>
-                            </div>
-                            <div className="word-profile-inline-body">
-                                <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "13px", flexWrap: "wrap" }}>
-                                    {newWordProfile.partOfSpeech && <span className="profile-pos">{newWordProfile.partOfSpeech}</span>}
-                                    {newWordProfile.pronunciation && <span className="profile-phonetic">{newWordProfile.pronunciation}</span>}
-                                    {newWordProfile.audio && (
-                                        <button className="profile-audio-btn" onClick={() => new Audio(newWordProfile.audio).play()}>▶ Listen</button>
-                                    )}
-                                </div>
-                                {newWordProfile.definitions?.[0] && (
-                                    <div className="profile-main-def" style={{ marginBottom: "14px" }}>
-                                        {newWordProfile.definitions[0].definition}
-                                    </div>
-                                )}
-                                {newWordProfile.memoryHook && (
-                                    <div style={{
-                                        borderLeft: "4px solid var(--accent)", padding: "10px 14px",
-                                        background: "var(--surface)", fontStyle: "italic",
-                                        fontSize: "0.87rem", lineHeight: "1.65"
-                                    }}>
-                                        🧠 {newWordProfile.memoryHook}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Recently added — shows just the single most recent word (not the
-                        whole list) so the dashboard stays a quick glance, not a feed.
-                        "View all" below links out to the full list on /vocabulary. */}
-                    {words.length > 0 && !newWordProfile && !loadingProfile && (
+                    {/* Recently added — just the single latest word, so the dashboard stays a quick glance. */}
+                    {words.length > 0 && (
                         <div>
-                            <p className="section-title">Recently added</p>
+                            <div className="dashboard-recent-header">
+                                <p className="section-title">Recently added</p>
+                                {words.length > 1 && (
+                                    <button className="dashboard-link" onClick={() => navigate("/vocabulary")}>
+                                        View all {words.length} words
+                                    </button>
+                                )}
+                            </div>
                             <div className="word-list">
                                 {words.slice(0, 1).map(w => (
                                     <div key={w._id} className="word-card">
@@ -252,29 +167,115 @@ function Dashboard() {
                                                 className="word-card-word-link"
                                                 onClick={() => navigate(`/profile/${encodeURIComponent(w.word)}`)}
                                             >
-                                                {w.word} →
+                                                {w.word}
                                             </h3>
                                             <span className={`status-btn ${w.status === "learned" ? "learned" : "review"}`}>
                                                 {w.status === "learned" ? "✓ Learned" : "Review"}
                                             </span>
                                         </div>
-                                        <p className="meaning">{w.meaning}</p>
+                                        <p className="meaning">{w.partOfSpeech && <em>({w.partOfSpeech}) </em>}{w.meaning}</p>
                                     </div>
                                 ))}
                             </div>
-                            {words.length > 1 && (
-                                <button
-                                    className="btn btn-ghost"
-                                    onClick={() => navigate("/vocabulary")}
-                                    style={{ width: "100%", marginTop: "0", borderTop: "none" }}
-                                >
-                                    View all {words.length} words →
-                                </button>
-                            )}
                         </div>
                     )}
 
                 </div>
+
+                {/* NEW: Difficult words results — a pop-up over the page instead of a panel that pushes everything down. */}
+                {diffOpen && diffWords.length > 0 && (
+                    <div className="modal-backdrop" onClick={() => setDiffOpen(false)}>
+                        <div className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Difficult words">
+                            <div className="modal-header">
+                                <div>
+                                    <h3>{diffWords.length} difficult words found</h3>
+                                    {diffStats && (
+                                        <p className="modal-sub">
+                                            {diffStats.pages > 0 ? `${diffStats.pages} pages · ` : ""}
+                                            {diffStats.totalTokens?.toLocaleString()} tokens · {diffStats.uniqueWords?.toLocaleString()} unique words scanned
+                                        </p>
+                                    )}
+                                    {diffTruncated && diffStats && (
+                                        <p className="modal-sub" style={{ color: "var(--accent)" }}>
+                                            Large PDF — only analysed the first {diffStats.pagesAnalyzed} of {diffStats.pages} pages
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="modal-header-actions">
+                                    <button className="btn btn-primary btn-sm" style={{ width: "auto" }} onClick={addAllDiffWords}>
+                                        Add all
+                                    </button>
+                                    <button className="modal-close" aria-label="Close" onClick={() => setDiffOpen(false)}><TbX size={16} /></button>
+                                </div>
+                            </div>
+                            <div className="modal-body">
+                                <p className="modal-sub" style={{ marginBottom: "12px" }}>
+                                    Ranked by difficulty — length, academic patterns, rarity in this document.
+                                    Click a word to add it to your vocabulary.
+                                </p>
+                                {diffWords.map(w => (
+                                    <span
+                                        key={w}
+                                        className={`difficult-word-chip ${diffAdded.has(w) ? "added" : ""}`}
+                                        onClick={() => !diffAdded.has(w) && addDifficultWord(w)}
+                                    >
+                                        {w}
+                                        <span className="chip-badge">
+                                            {diffAdded.has(w) ? "✓" : "+ Add"}
+                                        </span>
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* NEW: the new word's profile preview — also a pop-up now (it used to appear inside the page and push the dashboard down). */}
+                {(loadingProfile || newWordProfile) && (
+                    <div className="modal-backdrop" onClick={() => !loadingProfile && setNewWordProfile(null)}>
+                        <div className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Word profile">
+                            {loadingProfile && (
+                                <div className="modal-body" style={{ textAlign: "center", padding: "36px 20px" }}>
+                                    <div className="loading-dots"><span/><span/><span/></div>
+                                    <p style={{ color: "var(--text-2)", marginTop: "10px", fontSize: "0.85rem" }}>
+                                        Building word profile…
+                                    </p>
+                                </div>
+                            )}
+                            {newWordProfile && !loadingProfile && (
+                                <>
+                                    <div className="modal-header">
+                                        <h3>{newWordProfile.word}</h3>
+                                        <button className="modal-close" aria-label="Close" onClick={() => setNewWordProfile(null)}><TbX size={16} /></button>
+                                    </div>
+                                    <div className="modal-body">
+                                        <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "13px", flexWrap: "wrap" }}>
+                                            {newWordProfile.partOfSpeech && <span className="profile-pos">{newWordProfile.partOfSpeech}</span>}
+                                            {newWordProfile.pronunciation && <span className="profile-phonetic">{newWordProfile.pronunciation}</span>}
+                                            {newWordProfile.audio && (
+                                                <button className="profile-audio-btn" onClick={() => new Audio(newWordProfile.audio).play()}>▶ Listen</button>
+                                            )}
+                                        </div>
+                                        {newWordProfile.definitions?.[0] && (
+                                            <div className="profile-main-def" style={{ marginBottom: "14px" }}>
+                                                {newWordProfile.definitions[0].definition}
+                                            </div>
+                                        )}
+                                        {newWordProfile.memoryHook && (
+                                            <div style={{
+                                                borderLeft: "4px solid var(--accent)", padding: "10px 14px",
+                                                background: "var(--surface)", fontStyle: "italic",
+                                                fontSize: "0.87rem", lineHeight: "1.65"
+                                            }}>
+                                                🧠 {newWordProfile.memoryHook}
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                )}
         </AppLayout>
     );
 }
