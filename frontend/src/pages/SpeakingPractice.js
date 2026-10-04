@@ -451,7 +451,7 @@ function SpeakingPractice() {
 
     const micSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
 
-    return (
+
       return (
     <AppLayout>
         <div className="speaking-page">
@@ -882,7 +882,7 @@ function SpeakingPractice() {
         </div>
     </AppLayout>
 );
-    );
+    
 }
 
 export default SpeakingPractice;
