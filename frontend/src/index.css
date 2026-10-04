@@ -3067,3 +3067,280 @@ input:focus {
   /* Auth */
   .auth-page { padding: 14px; }
 }
+
+
+/* ══════════════════════════════════════════════════════════════════
+   CLEAN LOOK — yellow Gazette theme, Slack-style
+   This block is the LAST thing in the file on purpose: CSS rules that come later win over
+   earlier ones with the same strength, so everything here quietly overrides the older
+   hard-bordered, all-capitals styling above — without touching those older rules.
+   Colors are untouched (same yellow --mustard, --paper, --ink); only borders, corners,
+   capitals and spacing change. Everything is scoped to [data-theme="gazette"], so the
+   golden theme keeps its own look.
+══════════════════════════════════════════════════════════════════ */
+
+/* 1. Labels in normal sentence case instead of SMALL SPACED CAPITALS */
+[data-theme="gazette"] .btn,
+[data-theme="gazette"] .btn-danger,
+[data-theme="gazette"] .input-label,
+[data-theme="gazette"] .stat-label,
+[data-theme="gazette"] .section-title,
+[data-theme="gazette"] .status-btn,
+[data-theme="gazette"] .filter-tab,
+[data-theme="gazette"] .profile-tab,
+[data-theme="gazette"] .profile-pos,
+[data-theme="gazette"] .profile-audio-btn,
+[data-theme="gazette"] .profile-pos-badge,
+[data-theme="gazette"] .source-type-badge,
+[data-theme="gazette"] .source-link,
+[data-theme="gazette"] .chip-badge,
+[data-theme="gazette"] .context-label,
+[data-theme="gazette"] .result-label,
+[data-theme="gazette"] .flashcard-front .hint,
+[data-theme="gazette"] .card-counter,
+[data-theme="gazette"] .score-badge,
+[data-theme="gazette"] .reader-page-controls span,
+[data-theme="gazette"] .reader-thumbs-tab,
+[data-theme="gazette"] .reader-bookmark-page,
+[data-theme="gazette"] .quiz-instruction,
+[data-theme="gazette"] .quiz-feedback,
+[data-theme="gazette"] .reader-library-upload-btn span,
+[data-theme="gazette"] .app-sidebar-status,
+[data-theme="gazette"] .app-topbar-status {
+  text-transform: none;   /* show the text exactly as written ("Total words", not "TOTAL WORDS") */
+  letter-spacing: 0;      /* the wide letter gaps only made sense for capitals */
+}
+
+/* Small labels that were tiny because they were capitals need a little more size in sentence case */
+[data-theme="gazette"] .btn { font-size: 0.84rem; font-weight: 500; border-radius: 8px; }
+[data-theme="gazette"] .input-label { font-size: 0.8rem; font-weight: 600; }
+[data-theme="gazette"] .stat-label { font-size: 0.8rem; font-weight: 500; margin-top: 6px; }
+[data-theme="gazette"] .section-title { font-size: 0.92rem; font-weight: 600; color: var(--ink); margin-bottom: 0; }
+[data-theme="gazette"] .filter-tab,
+[data-theme="gazette"] .profile-tab { font-size: 0.82rem; font-weight: 500; }
+
+/* 2. Soft, thin lines instead of thick black ones (reader panels, quiz options, inputs) */
+[data-theme="gazette"] .quiz-options {
+  border: 1px solid rgba(0,0,0,0.10);  /* thin soft outline */
+  border-radius: 12px;                 /* rounded corners */
+  overflow: hidden;                    /* keeps the option rows inside the rounded edge */
+}
+[data-theme="gazette"] .reader-left { border-right: 1px solid rgba(0,0,0,0.10); }
+[data-theme="gazette"] .reader-thumbs { border-right: 1px solid rgba(0,0,0,0.10); }
+[data-theme="gazette"] .reader-toolbar { border-bottom: 1px solid rgba(0,0,0,0.10); }
+[data-theme="gazette"] .reader-result { border-top: 1px solid rgba(0,0,0,0.10); }
+[data-theme="gazette"] .search-input {
+  border-color: rgba(0,0,0,0.18);
+  border-radius: 10px;
+  background: #fff;
+}
+[data-theme="gazette"] .search-input:focus { border-color: var(--ink); }
+
+/* 3. Dashboard numbers: three separate soft cards instead of one joined black-framed box */
+[data-theme="gazette"] .stats-row {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;     /* the cards now have their own rounded edges */
+  gap: 10px;             /* breathing room between the three cards */
+  margin-bottom: 12px;
+}
+[data-theme="gazette"] .stat-card,
+[data-theme="gazette"] .stat-card:last-child {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+[data-theme="gazette"] .stat-number { font-size: 1.75rem; font-weight: 600; }
+
+/* 4. Add-a-word box: a rounded field with its own button inside */
+[data-theme="gazette"] .add-word-box {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.2);
+  border-radius: 10px;
+  box-shadow: none;
+  overflow: visible;
+  padding: 5px;
+  gap: 6px;
+  margin-bottom: 0;
+  align-items: center;
+}
+[data-theme="gazette"] .add-word-box input { padding: 8px 12px; font-size: 0.92rem; }
+[data-theme="gazette"] .add-word-box .btn {
+  border: none;          /* no divider line before the button any more */
+  border-radius: 8px;    /* the button is its own rounded shape */
+  padding: 9px 16px;
+  white-space: nowrap;
+}
+
+/* 5. Filter tabs + profile tabs: a soft segmented control (black active tab with yellow text) */
+[data-theme="gazette"] .filter-tabs,
+[data-theme="gazette"] .profile-tabs {
+  padding: 3px;
+  gap: 2px;
+  background: #f0ebe0;
+  border: none;
+  border-radius: 10px;
+}
+[data-theme="gazette"] .filter-tab,
+[data-theme="gazette"] .profile-tab {
+  border: none;
+  border-radius: 8px;
+}
+[data-theme="gazette"] .filter-tab:hover,
+[data-theme="gazette"] .profile-tab:hover { background: rgba(0,0,0,0.06); }
+[data-theme="gazette"] .filter-tab.active,
+[data-theme="gazette"] .profile-tab.active { background: var(--ink); color: var(--mustard); }
+
+/* 6. Words: plain word (no dotted underline, no arrow) and a soft status tag */
+[data-theme="gazette"] .word-card-word-link {
+  text-decoration: none;       /* removes the dotted underline */
+  font-family: var(--body);
+  font-size: 1rem;
+  font-weight: 600;
+}
+[data-theme="gazette"] .word-card-word-link:hover {
+  color: var(--ink);
+  text-decoration: underline;  /* a simple underline only while hovering, so it still feels clickable */
+  text-decoration-style: solid;
+  text-underline-offset: 3px;
+}
+[data-theme="gazette"] .status-btn {
+  border: none;
+  border-radius: 999px;        /* soft pill instead of a boxed tag */
+  padding: 3px 11px;
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+[data-theme="gazette"] .status-btn.review { background: #f0ebe0; color: var(--ink); }
+[data-theme="gazette"] .status-btn.review:hover { background: #e6dfcf; color: var(--ink); }
+
+/* 7. Sidebar status line: sentence case, no dot */
+[data-theme="gazette"] .app-sidebar-status { font-size: 0.8rem; font-weight: 500; }
+[data-theme="gazette"] .app-sidebar-status-dot { display: none; }
+
+/* 8. Page header: the Playfair headline stays; the rule under it is a faint hairline */
+[data-theme="gazette"] .page-header { margin-bottom: 24px; padding-bottom: 14px; }
+[data-theme="gazette"] .page-header p { font-size: 0.9rem; }
+
+/* 9. The WordKnit name shown inside the page area (when the sidebar is hidden, or on the Dashboard) */
+.app-main-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 44px 0;
+  font-family: var(--heading);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+
+/* 10. Dashboard: compact page + one action row + pop-ups */
+.page-container.page-container--compact { padding-top: 14px; padding-bottom: 24px; }
+.page-container--compact .page-header { margin-bottom: 16px; padding-bottom: 10px; }
+.page-container--compact .page-header h1 { font-size: 1.9rem; }
+
+.dashboard-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 1fr); /* wide Add field + two equal tiles */
+  gap: 10px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+.dashboard-actions .add-word-box { margin-bottom: 0; }
+
+.action-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 12px;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 10px;
+  font-family: var(--body);
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink);
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.action-tile:hover:not(:disabled) { background: var(--accent-bg); border-color: rgba(0,0,0,0.22); }
+.action-tile:disabled { opacity: 0.65; cursor: default; }
+.action-tile-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--mustard);   /* the yellow brand color as a small accent tile */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.action-tile-title { display: block; font-size: 0.86rem; font-weight: 600; }
+.action-tile-sub { display: block; font-size: 0.74rem; color: var(--text-3); }
+
+.dashboard-note { font-size: 0.84rem; color: var(--text-2); margin: -6px 0 14px; }
+.dashboard-recent-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+.dashboard-link {
+  border: none;
+  background: none;
+  font-family: var(--body);
+  font-size: 0.84rem;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.dashboard-link:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;                         /* cover the whole window */
+  background: rgba(0,0,0,0.35);     /* dim the page behind the pop-up */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 300;
+}
+.modal-card {
+  background: var(--paper);
+  border-radius: 14px;
+  width: min(640px, 100%);
+  max-height: 80vh;
+  overflow-y: auto;                 /* long results scroll inside the pop-up, not the page */
+  box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+}
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+.modal-header h3 { font-size: 1.05rem; font-weight: 600; }
+.modal-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.modal-sub { font-size: 0.76rem; color: var(--text-3); margin-top: 3px; }
+.modal-body { padding: 16px 20px 20px; }
+.modal-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.06);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.modal-close:hover { background: rgba(0,0,0,0.12); }
+
+@media (max-width: 860px) {
+  .app-main-brand { display: none; }   /* phones already show the name in the top bar */
+  .dashboard-actions { grid-template-columns: 1fr 1fr; }
+  .dashboard-actions .add-word-wrap { grid-column: 1 / -1; }   /* the Add field gets its own full-width row on small screens */
+  .page-container.page-container--compact { padding-left: 18px; padding-right: 18px; }
+}
