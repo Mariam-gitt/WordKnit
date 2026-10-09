@@ -3,25 +3,19 @@ const router   = express.Router();
 const protect  = require("../middleware/authMiddleware");
 const Bookmark = require("../models/Bookmark");
 const Document = require("../models/Document"); // NEW: used to check the PDF really belongs to the logged-in user
-const mongoose = require("mongoose");           // NEW: used to check that documentId looks like a real MongoDB id
+const { validateBody, validateParams } = require("../middleware/validate"); // validateBody checks req.body, validateParams checks URL ids
+const { createBookmarkSchema } = require("../validators/documentSchemas"); // the rules for creating a bookmark (documentId, text, page, note)
 
 /* ─────────────────────────────────────────────────────────
    POST /api/bookmarks
    Save a highlighted text selection as a bookmark
 ────────────────────────────────────────────────────────── */
-router.post("/", protect, async (req, res) => {
+router.post("/", protect, validateBody(createBookmarkSchema), async (req, res) => {
     try {
         const { documentId, text, page, note } = req.body;
 
-        if (!documentId || !text || !page) {
-            return res.status(400).json({ message: "documentId, text, and page are required" });
-        }
-
-        // NEW (validation): text must really be text, and documentId must look like a MongoDB id,
-        // otherwise .trim() or the database lookup below could crash with a confusing 500 error.
-        if (typeof text !== "string" || !mongoose.isValidObjectId(documentId)) {
-            return res.status(400).json({ message: "Invalid documentId or text" });
-        }
+        // documentId / text / page / note were ALREADY checked and cleaned by validateBody(createBookmarkSchema) above,
+        // so the old manual if-checks that used to sit here are no longer needed.
 
         // NEW (SECURITY): only allow a bookmark on a document THIS user owns. Before, anyone could attach
         // bookmarks to any document id they could guess. Document.exists() answers yes/no without loading the PDF.
@@ -49,7 +43,7 @@ router.post("/", protect, async (req, res) => {
    GET /api/bookmarks/:documentId
    List all bookmarks for a given PDF, oldest page first
 ────────────────────────────────────────────────────────── */
-router.get("/:documentId", protect, async (req, res) => {
+router.get("/:documentId", protect, validateParams("documentId"), async (req, res) => {
     try {
         const bookmarks = await Bookmark.find({
             documentId: req.params.documentId,
@@ -65,7 +59,7 @@ router.get("/:documentId", protect, async (req, res) => {
 /* ─────────────────────────────────────────────────────────
    DELETE /api/bookmarks/:id
 ────────────────────────────────────────────────────────── */
-router.delete("/:id", protect, async (req, res) => {
+router.delete("/:id", protect, validateParams("id"), async (req, res) => {
     try {
         const bookmark = await Bookmark.findOneAndDelete({ _id: req.params.id, userId: req.user });
         if (!bookmark) return res.status(404).json({ message: "Bookmark not found" });

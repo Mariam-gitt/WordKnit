@@ -4,6 +4,9 @@ const multer   = require("multer");
 const protect  = require("../middleware/authMiddleware");
 const Document = require("../models/Document");
 const Bookmark = require("../models/Bookmark");
+const mongoose = require("mongoose"); // imported ONCE at the top (it used to be require()d inline inside a route, which is hard to read)
+const { validateBody, validateParams } = require("../middleware/validate"); // validateBody checks req.body, validateParams checks URL ids
+const { updateLastPageSchema } = require("../validators/documentSchemas"); // the rule for the lastPage body
 
 // 20MB limit — MongoDB documents cap at 16MB, base64 adds ~33% overhead,
 // so keep the raw PDF comfortably under that.
@@ -62,7 +65,7 @@ router.get("/", protect, async (req, res) => {
 
         // Attach bookmark counts per document
         const counts = await Bookmark.aggregate([
-            { $match: { userId: new (require("mongoose").Types.ObjectId)(req.user) } },
+            { $match: { userId: new mongoose.Types.ObjectId(req.user) } },
             { $group: { _id: "$documentId", count: { $sum: 1 } } }
         ]);
         const countMap = {};
@@ -84,7 +87,7 @@ router.get("/", protect, async (req, res) => {
    GET /api/documents/:id
    Fetch a single PDF including its file bytes, to reopen it
 ────────────────────────────────────────────────────────── */
-router.get("/:id", protect, async (req, res) => {
+router.get("/:id", protect, validateParams("id"), async (req, res) => {
     try {
         const doc = await Document.findOne({ _id: req.params.id, userId: req.user });
         if (!doc) return res.status(404).json({ message: "PDF not found" });
@@ -99,7 +102,7 @@ router.get("/:id", protect, async (req, res) => {
    PATCH /api/documents/:id
    Update last-read page (called whenever the user changes page)
 ────────────────────────────────────────────────────────── */
-router.patch("/:id", protect, async (req, res) => {
+router.patch("/:id", protect, validateParams("id"), validateBody(updateLastPageSchema), async (req, res) => {
     try {
         const { lastPage } = req.body;
         const doc = await Document.findOneAndUpdate(
@@ -118,7 +121,7 @@ router.patch("/:id", protect, async (req, res) => {
    DELETE /api/documents/:id
    Remove a saved PDF and its bookmarks
 ────────────────────────────────────────────────────────── */
-router.delete("/:id", protect, async (req, res) => {
+router.delete("/:id", protect, validateParams("id"), async (req, res) => {
     try {
         const doc = await Document.findOneAndDelete({ _id: req.params.id, userId: req.user });
         if (!doc) return res.status(404).json({ message: "PDF not found" });
