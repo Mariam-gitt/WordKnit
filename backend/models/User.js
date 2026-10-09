@@ -8,13 +8,16 @@ const userSchema = new mongoose.Schema({
 
     name: {
         type: String,
-        required: true
+        required: true,
+        trim: true // Mongoose removes stray spaces at the start/end before saving
     },
 
     email: {
         type: String,
         required: true,
-        unique: true // no duplicate accounts
+        unique: true, // no duplicate accounts
+        lowercase: true, // Mongoose always saves emails in lowercase, so "A@b.com" and "a@b.com" can never become two accounts
+        trim: true // ...and removes stray spaces, so the rule is enforced at the database level too, not only in the controller
     },
 
     password: {

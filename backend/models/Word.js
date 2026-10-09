@@ -33,6 +33,9 @@ const wordSchema = new mongoose.Schema({
     // review | learned
     status: {
         type: String,
+        // enum = the ONLY values Mongoose will accept for this field. Anything else (e.g. "banana") makes the save fail,
+        // so the database itself refuses bad data even if some route forgets to validate.
+        enum: ["review", "learned"],
         default: "review"
     },
 
