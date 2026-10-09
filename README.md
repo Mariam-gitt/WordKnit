@@ -123,6 +123,16 @@ JWT_SECRET=your_secret_key
 GROQ_API_KEY=your_groq_api_key
 PORT=5000
 
+# which website(s) may call this API (CORS). Comma-separated, no trailing slash needed.
+# REQUIRED on the live server (e.g. https://your-frontend.vercel.app); defaults to http://localhost:5173 for local dev.
+FRONTEND_URL=http://localhost:5173
+
+# login cookie settings (the login token lives in an httpOnly cookie).
+# Defaults are right for most setups: production = SameSite=None + Secure (frontend and backend on different domains), development = SameSite=Lax.
+# If frontend and backend share ONE address (e.g. Docker + nginx), use COOKIE_SAMESITE=lax and, for plain http://localhost, COOKIE_SECURE=false.
+# COOKIE_SAMESITE=lax
+# COOKIE_SECURE=false
+
 # optional integrations
 HUBSPOT_PRIVATE_APP_TOKEN=your_hubspot_token
 RESEND_API_KEY=your_resend_key
@@ -142,6 +152,13 @@ python rag_llm_service.py
 ```
 
 ### 3) Frontend setup
+
+By default the frontend talks to the deployed Vercel backend. To use your LOCAL backend, create `frontend/.env` with:
+
+```env
+VITE_API_URL=http://localhost:5000/api
+```
+
 
 ```bash
 cd frontend
