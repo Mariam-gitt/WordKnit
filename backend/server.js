@@ -1,5 +1,8 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet"); // adds protective security headers to every response
+const cookieParser = require("cookie-parser"); // reads the Cookie header the browser sends and puts the values in req.cookies
+const { requireAllowedOrigin } = require("./middleware/originCheck"); // CSRF defence: blocks state-changing requests that come from other websites
 const dotenv = require("dotenv");
 const connectDB = require("./config/db");
 const { aiLimiter } = require("./middleware/rateLimiters"); // SECURITY: limits how often the paid-AI routes can be called
@@ -13,19 +16,47 @@ const app = express();
 // and the rate limiter would count all users together instead of each person separately.
 app.set("trust proxy", 1);
 
-// CORS lets the deployed frontend (a different domain) call this API. "*" allows any
-// origin — fine for now since there's no cookie-based auth, but tighten this to your
-// actual frontend URL later if you want to restrict who can call the API directly.
+// helmet = one line that adds a bundle of protective HTTP response headers (e.g. stop browsers guessing file types, block the page being put in an iframe).
+// crossOriginResourcePolicy "cross-origin" is set because this is an API that a frontend on ANOTHER domain must be allowed to call.
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
+
+// CORS = the browser rule "a web page may only call an API on another domain if that API says it's allowed".
+// SECURITY: before, origin was "*" (ANY website could call this API from a visitor's browser). Now only the origins listed in the
+// FRONTEND_URL environment variable are allowed. Several can be given, separated by commas, e.g. "https://wordknit.vercel.app,http://localhost:5173".
+// If FRONTEND_URL isn't set we fall back to the local Vite dev server so `npm run dev` still works on your laptop.
+const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
+    .split(",")                 // turn "a,b" into ["a", "b"]
+    .map((url) => url.trim().replace(/\/$/, "")) // remove spaces and a trailing "/" — browsers send origins WITHOUT a trailing slash
+    .filter(Boolean);           // drop empty entries (e.g. from an accidental trailing comma)
+
+// If this is the live server and FRONTEND_URL was forgotten, the deployed frontend would be blocked — warn loudly in the logs.
+if (process.env.NODE_ENV === "production" && !process.env.FRONTEND_URL) {
+    console.warn("WARNING: FRONTEND_URL is not set — the deployed frontend will be blocked by CORS.");
+}
+
 const corsOptions = {
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true
+    // origin can be a function: the browser's Origin header comes in, and we answer yes or no.
+    origin: (origin, callback) => {
+        // No Origin header = not a browser cross-site call (curl, Postman, server-to-server, same-origin requests). CORS doesn't apply to those.
+        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        // Not on the list: answer "no" WITHOUT throwing — the browser then blocks the response, and the server doesn't log a scary error.
+        return callback(null, false);
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], // the HTTP methods the frontend is allowed to use
+    allowedHeaders: ["Content-Type"], // the only header the frontend sends now (the login token travels in a cookie, so "Authorization" is no longer needed)
+    credentials: true // NEW: lets the browser send/receive cookies on cross-site calls. Safe ONLY because origin above is a specific list, never "*" (browsers refuse that combo).
 };
 
 app.use(cors(corsOptions));
 
 app.use(express.json());
+
+// NEW: fills req.cookies from the Cookie header, so the `protect` middleware can read the login cookie.
+app.use(cookieParser());
+
+// NEW (SECURITY): with cookie login, an evil website could make a visitor's browser send POST/PATCH/DELETE requests to this API.
+// This check rejects any such request whose Origin is not one of our own frontends (the same FRONTEND_URL list as CORS).
+app.use(requireAllowedOrigin(allowedOrigins));
 
 // Connect to MongoDB before handling each request. This looks wasteful, but it's actually
 // cheap and necessary: on Vercel, each request may hit a fresh serverless instance with no
