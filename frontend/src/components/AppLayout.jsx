@@ -5,6 +5,7 @@ import { TbMenu2, TbLogout } from "react-icons/tb"; // menu icon and logout icon
 import YarnBallLogo from "./YarnBallLogo"; // the yarn-ball brand mark
 import { IconButton } from "./ui"; // our shared icon button with a tooltip
 import { NAV_LINKS } from "../navLinks"; // the list of sidebar links
+import { useAuth } from "../AuthContext"; // NEW: gives us signOut() for the logout button
 
 // localStorage key that remembers whether the desktop sidebar is hidden, so it stays hidden next visit.
 const COLLAPSED_KEY = "wk-sidebar-collapsed";
@@ -18,6 +19,7 @@ const COLLAPSED_KEY = "wk-sidebar-collapsed";
  */
 function AppLayout({ children, reader = false, statusCount }) {
     const navigate = useNavigate(); // lets buttons change the page
+    const { signOut } = useAuth(); // NEW: child → parent: asks the server to clear the login cookie and marks the app as logged out
     const location = useLocation(); // current URL, used to highlight the active menu item
     const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_KEY) === "1"); // desktop: sidebar hidden?
     const [mobileOpen, setMobileOpen] = useState(false); // phones: is the slide-in drawer open?
@@ -38,7 +40,7 @@ function AppLayout({ children, reader = false, statusCount }) {
     };
 
     const goTo = (path) => { navigate(path); setMobileOpen(false); }; // change page and close the drawer
-    const logout = () => { localStorage.removeItem("token"); navigate("/"); }; // forget the login and go to the sign-in page
+    const logout = async () => { await signOut(); navigate("/"); }; // NEW: the server clears the httpOnly cookie (JavaScript can't), then we go to the sign-in page
 
     return (
         <Tooltip.Provider delayDuration={250}>
