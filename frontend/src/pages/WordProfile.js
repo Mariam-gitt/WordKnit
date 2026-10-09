@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api";
 import AppLayout from "../components/AppLayout";
+import { useAuth } from "../AuthContext"; // NEW: gives us signOut() for the delete-account flow
 
 // ── In-memory profile cache to speed up re-visits ──
 const profileCache = {};
@@ -10,6 +11,7 @@ const profileCache = {};
 function WordProfile() {
     const { word } = useParams();
     const navigate = useNavigate();
+    const { signOut } = useAuth(); // NEW: child → parent: marks the app as logged out after the account is deleted
     const [profile, setProfile]       = useState(null);
     const [loading, setLoading]       = useState(true);
     const [error, setError]           = useState("");
@@ -79,7 +81,7 @@ function WordProfile() {
         setDeletingAccount(true);
         try {
             await api.delete("/auth/account");
-            localStorage.removeItem("token");
+            await signOut(); // NEW: the server already cleared the cookie when it deleted the account; this also resets the app's login state
             navigate("/");
         } catch {
             alert("Failed to delete account. Please try again.");
