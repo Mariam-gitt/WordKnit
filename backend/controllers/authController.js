@@ -28,7 +28,7 @@
 //                 subject: "Welcome to WordKnit 💛",
 //                 html: `
 //                     <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-//                         <h2 style="color: #9b2335;">Welcome to WordKnit, ${name}!</h2>
+//                         <h2 style="color: #9b2335;">Welcome to WordKnit, ${escapeHtml(name)}!</h2>
 //                         <p>Your account is ready. Start building your vocabulary by reading PDFs,
 //                         saving words, and quizzing yourself — WordKnit will help the words stick.</p>
 //                         <p style="color: #888; font-size: 13px; margin-top: 32px;">
@@ -185,6 +185,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
 const { syncContactToHubspot } = require("../utils/hubspotService");
+const { SESSION_DAYS, setAuthCookie, clearAuthCookie } = require("../utils/authCookie"); // shared cookie rules: lifetime in days + helpers that set/clear the login cookie
 // New: pulls in our HubSpot sync function so we can call it during registration below.
 
 // signToken(): bundles a user's Mongo _id into a signed JWT (JSON Web Token) — a
@@ -197,41 +198,20 @@ const { syncContactToHubspot } = require("../utils/hubspotService");
 const signToken = (userId) => jwt.sign(
     { id: userId }, // payload: only the user's id is embedded, nothing sensitive
     process.env.JWT_SECRET, // secret key used to sign + later verify the token
-    { expiresIn: "30d" } // token (and therefore the logged-in session) now lasts 30 days
+    { expiresIn: `${SESSION_DAYS}d` } // token lifetime now comes from ONE shared number (utils/authCookie.js), so it always matches the cookie's lifetime
 );
 
-// ── Shared validation helpers (used by both register and login below) ──
+// NOTE: the old hand-written validateCredentials() + EMAIL_REGEX that lived here were MOVED to validators/authSchemas.js (zod).
+// The routes now run validateBody(registerSchema / loginSchema) BEFORE these controllers, so req.body is already checked and cleaned here.
 
-// A simple, widely-used pattern for "looks like an email": something, an @, something,
-// a dot, something. Not a full RFC-5322 validator (those are notoriously overkill) —
-// just enough to catch obvious typos like "mariam@gmail" or "mariamgmail.com".
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// Centralizes the register/login input checks so both routes give the same,
-// predictable error messages instead of duplicating the same if-checks twice.
-// Returns a string describing the FIRST problem found, or null if everything's fine.
-const validateCredentials = ({ name, email, password, isRegister }) => {
-    // isRegister is true only on the register route — login doesn't need a name.
-    if (isRegister && (!name || !name.trim())) {
-        return "Name is required.";
-    }
-    if (!email || !email.trim()) {
-        return "Email is required.";
-    }
-    if (!EMAIL_REGEX.test(email.trim())) {
-        return "Please enter a valid email address.";
-    }
-    if (!password) {
-        return "Password is required.";
-    }
-    // Only enforce a minimum length on register — an existing account created before
-    // this rule shouldn't suddenly be told its (already-set) password is "too short"
-    // just to log in.
-    if (isRegister && password.length < 6) {
-        return "Password must be at least 6 characters long.";
-    }
-    return null; // no problems found
-};
+// escapeHtml(): turns the special HTML characters into harmless text so a user-typed name can't inject HTML into the welcome email.
+// Example: a name like <b>hi</b> would otherwise be rendered as real bold text (or worse, a fake link) inside the email.
+const escapeHtml = (text) => String(text)
+    .replace(/&/g, "&amp;")   // & must be replaced FIRST, otherwise we would double-escape the & in the next lines
+    .replace(/</g, "&lt;")    // < starts an HTML tag, so it becomes the harmless text &lt;
+    .replace(/>/g, "&gt;")    // > ends an HTML tag, so it becomes &gt;
+    .replace(/"/g, "&quot;")  // " could close an HTML attribute early, so it becomes &quot;
+    .replace(/'/g, "&#39;");  // ' could do the same in single-quoted attributes, so it becomes &#39;
 
 /**
  * Send a welcome email via Resend. Fire-and-forget: registration must
@@ -280,25 +260,13 @@ const sendWelcomeEmail = async (name, email) => {
  */
 exports.register = async (req, res) => {
 
+    // req.body was ALREADY validated and cleaned by validateBody(registerSchema) in authRoutes.js:
+    // name is trimmed, email is trimmed + lowercase, password is 8-72 characters. So we can use the values directly.
     const { name, email, password } = req.body;
-
-    // Run the shared checks (name present, email looks real, password long enough)
-    // BEFORE touching the database at all — fail fast with a clear message instead
-    // of e.g. letting bcrypt or Mongo throw a confusing error on bad input.
-    const validationError = validateCredentials({ name, email, password, isRegister: true });
-    if (validationError) {
-        return res.status(400).json({ message: validationError });
-    }
-
-    // Normalize the email once here so "Mariam@Gmail.com" and "mariam@gmail.com"
-    // are always treated as the exact same account — trim() drops stray leading/
-    // trailing spaces, toLowerCase() removes case as a source of "duplicate" accounts.
-    const normalizedEmail = email.trim().toLowerCase();
-    const trimmedName = name.trim();
 
     try {
         // check if user exists (now checked against the normalized email)
-        const exists = await User.findOne({ email: normalizedEmail });
+        const exists = await User.findOne({ email });
         if (exists) {
             return res.status(400).json({ message: "User already exists" });
         }
@@ -308,8 +276,8 @@ exports.register = async (req, res) => {
 
         // create user
         const user = await User.create({
-            name: trimmedName,
-            email: normalizedEmail,
+            name,
+            email,
             password: hashedPassword
         });
 
@@ -317,22 +285,35 @@ exports.register = async (req, res) => {
         // no need to make the user re-enter credentials on the login page.
         const token = signToken(user._id);
 
+        // NEW: the token now travels in an httpOnly COOKIE (a Set-Cookie header on this response) instead of in the JSON body.
+        // The browser stores it and JavaScript can never read it, so a script injected into the page can't steal the login.
+        setAuthCookie(res, token);
+
         // Don't await — email sending shouldn't delay or risk the response.
-        sendWelcomeEmail(trimmedName, normalizedEmail);
+        sendWelcomeEmail(name, email);
 
         // New: sync this new user into HubSpot as a Contact.
         // Same fire-and-forget pattern as sendWelcomeEmail above — no "await" here,
         // so a slow or failed HubSpot call can never delay or break the user's registration response.
-        syncContactToHubspot(trimmedName, normalizedEmail);
+        syncContactToHubspot(name, email);
 
         res.json({
             message: "User registered successfully 💛",
-            token,
+            // NOTE: "token" is intentionally NOT in the body anymore — it is only in the httpOnly cookie set above.
             user: user.name
         });
 
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        // 11000 = MongoDB's "duplicate key" error code. It happens if two sign-ups with the same email arrive at the exact same moment
+        // (both pass the findOne check above, but the unique index on email only lets ONE of them be saved).
+        if (error.code === 11000) {
+            // Same friendly message as the normal "already exists" check, instead of a scary server error.
+            return res.status(400).json({ message: "User already exists" });
+        }
+        // SECURITY: log the REAL error on the server only (for you to debug)...
+        console.log("REGISTER ERROR:", error.message);
+        // ...and send the user a generic message, so internal details (database or library errors) never leak to the browser.
+        res.status(500).json({ message: "Registration failed. Please try again." });
     }
 };
 
@@ -341,22 +322,11 @@ exports.register = async (req, res) => {
  */
 exports.login = async (req, res) => {
 
+    // req.body was ALREADY validated and cleaned by validateBody(loginSchema) in authRoutes.js (email is trimmed + lowercase).
     const { email, password } = req.body;
 
-    // Same shared checks as register (minus the name/min-length rule, since
-    // isRegister defaults to falsy) — catches an empty or malformed email/password
-    // before ever hitting the database.
-    const validationError = validateCredentials({ email, password, isRegister: false });
-    if (validationError) {
-        return res.status(400).json({ message: validationError });
-    }
-
-    // Normalize the same way register does, so a user who typed their email in a
-    // different case at signup can still log in without it being treated as "not found".
-    const normalizedEmail = email.trim().toLowerCase();
-
     try {
-        const user = await User.findOne({ email: normalizedEmail });
+        const user = await User.findOne({ email });
 
         // SECURITY: one identical message for "no such email" AND "wrong password". Two different messages
         // would let an attacker test which emails have accounts (called "user enumeration").
@@ -367,7 +337,8 @@ exports.login = async (req, res) => {
         if (!isMatch) return res.status(400).json({ message: INVALID_LOGIN });
 
         const token = signToken(user._id);
-        res.json({ token, user: user.name });
+        setAuthCookie(res, token); // NEW: send the token as an httpOnly cookie (the browser keeps it; JavaScript can't read it)
+        res.json({ user: user.name }); // NEW: the body no longer contains the token, only the display name
 
     } catch (error) {
         // SECURITY: log the real reason on the server, but send the user a generic message so internal details never leak.
@@ -398,12 +369,46 @@ exports.deleteAccount = async (req, res) => {
             User.findByIdAndDelete(userId)
         ]);
 
+        clearAuthCookie(res); // NEW: the account is gone, so also tell the browser to throw away the login cookie
         res.json({ message: "Account deleted" });
 
     } catch (error) {
         console.log("DELETE ACCOUNT ERROR:", error.message);
         res.status(500).json({ message: "Failed to delete account" });
     }
+};
+
+/**
+ * ME — "who am I?"  (NEW)
+ * The frontend can no longer peek at a token in localStorage (the cookie is hidden from JavaScript),
+ * so when the app loads it asks the server instead. The `protect` middleware has ALREADY checked the cookie by the time this runs.
+ */
+exports.me = async (req, res) => {
+    try {
+        // req.user was set by protect (the id inside the verified token). select("name") loads only the name, nothing else (never the password hash).
+        const user = await User.findById(req.user).select("name");
+        // The token was valid but the account no longer exists (e.g. deleted on another device): remove the stale cookie and say "not logged in".
+        if (!user) {
+            clearAuthCookie(res);
+            return res.status(401).json({ message: "User not found" });
+        }
+        // Logged in: send back the display name so the frontend can show it if it wants to.
+        res.json({ user: user.name });
+    } catch (error) {
+        // Log the real error on the server only; the user gets a generic message.
+        console.log("ME ERROR:", error.message);
+        res.status(500).json({ message: "Could not check your session" });
+    }
+};
+
+/**
+ * LOGOUT  (NEW)
+ * JavaScript can't delete an httpOnly cookie, so logging out has to be a request to the server, which tells the browser to remove it.
+ * No `protect` on this route on purpose: logging out when you're already logged out should just succeed quietly.
+ */
+exports.logout = (req, res) => {
+    clearAuthCookie(res); // sends the cookie back with a past expiry date, so the browser deletes it
+    res.json({ message: "Logged out" }); // simple confirmation for the frontend
 };
 
 /**
