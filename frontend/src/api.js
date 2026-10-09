@@ -1,78 +1,43 @@
-
-
+// axios = the library the app uses to send HTTP requests (GET, POST, ...) to the backend.
 import axios from "axios";
 
-/**
- * Create a reusable axios instance
- */
-// const api = axios.create({
-//     baseURL: "http://localhost:5000/api"
-// });
+// The backend address now comes from the VITE_API_URL environment variable (Vite exposes variables that start with VITE_ as import.meta.env.<NAME>).
+// If it isn't set we fall back to your deployed Vercel backend, so nothing changes unless you choose to set it.
+// Local development: create frontend/.env containing  VITE_API_URL=http://localhost:5000/api
+// Docker already sets VITE_API_URL=/api (see frontend/Dockerfile), which this line now actually respects.
+const baseURL = import.meta.env.VITE_API_URL || "https://my-mern-project-backend.vercel.app/api";
 
+// Create ONE reusable axios instance; every page imports this same object, so these settings apply to every request in the app.
 const api = axios.create({
-    // Replace this string with your actual live Vercel URL
-    baseURL: "https://my-mern-project-backend.vercel.app/api"
+    baseURL, // every request path like "/words" is added to this address
+    withCredentials: true // NEW: tells the browser to send and accept COOKIES on these requests. Without it the browser silently ignores the login cookie.
 });
 
-/**
- * AUTO-ATTACH TOKEN TO EVERY REQUEST
- */
-api.interceptors.request.use(
-    (config) => {
+// BEFORE this file had a request interceptor that read the token from localStorage and added an "Authorization: Bearer ..." header by hand.
+// It is gone: the browser now attaches the httpOnly login cookie by itself, and JavaScript never touches the token at all.
 
-        // Get token from localStorage
-        const token = localStorage.getItem("token");
+// Paths where a 401 ("not logged in") is a NORMAL answer, not a sign that a session just expired.
+// /auth/me is asked on every page load, and a visitor who hasn't signed in yet will (correctly) get a 401 there.
+const NORMAL_401_PATHS = ["/auth/me", "/auth/login", "/auth/register"];
 
-        // If token exists, attach it
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-
-        return config;
-    },
-
-    (error) => {
-        return Promise.reject(error);
-    }
-);
-
-/**
- * AUTO-HANDLE EXPIRED / INVALID TOKENS
- *
- * Before this, if a token expired (or was otherwise rejected by the backend's
- * `protect` middleware), the app didn't actually "log the user out" — it just kept
- * showing whatever page they were on while every single API call quietly failed in
- * the background with a 401. To the user that looked exactly like "I got logged
- * out for no reason", when really the token had simply gone stale.
- *
- * This response interceptor runs on every API response. When the backend replies
- * with 401 Unauthorized (the status `protect` sends for a missing/invalid/expired
- * token), it clears the stale token and sends the user back to the login page —
- * a real, visible logout — instead of leaving them stuck on a broken page.
- */
+// A response interceptor = a function that sees EVERY response (and every error) before the page that asked for it does.
 api.interceptors.response.use(
-    // Any successful (non-error) response is passed straight through unchanged.
+    // Successful responses just pass through untouched.
     (response) => response,
-
+    // Failed responses come here first.
     (error) => {
-        // error.response is undefined for network failures (no internet, server
-        // down, etc.) — those aren't an auth problem, so we only act on an actual
-        // 401 status coming back from the server.
-        if (error.response?.status === 401) {
-            // Remove the now-invalid token so ProtectedRoute (in App.js) won't
-            // think the user is still logged in on the next navigation.
-            localStorage.removeItem("token");
-
-            // Avoid an unnecessary redirect loop if the 401 happened to come from
-            // a request made while already sitting on the login page.
-            if (window.location.pathname !== "/") {
-                window.location.href = "/";
-            }
+        // error.config.url is the path that was requested, e.g. "/words" or "/auth/me".
+        const url = error.config?.url || "";
+        // 401 on a normal private request means the cookie expired or is invalid: the session is over.
+        if (error.response?.status === 401 && !NORMAL_401_PATHS.includes(url)) {
+            // We can't use React here (this file knows nothing about components), so we shout an event that AuthContext listens for.
+            // That makes the whole app switch to "logged out" and the protected pages send the user to the login screen.
+            window.dispatchEvent(new Event("wk-session-expired"));
         }
-        // Re-throw so the calling code's own .catch()/try-catch still runs as before
-        // (e.g. a page can still show its own error message alongside this redirect).
+        // Still pass the error on, so the page that made the request can show its own message as before.
         return Promise.reject(error);
     }
 );
 
+// Export the instance; pages write: import api from "../api".
 export default api;

@@ -10,6 +10,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 // everyone sees, so there's no benefit to code-splitting it — doing so would just add an
 // extra "Loading…" flash on the page people land on first, for no real speed gain.
 import Login from "./pages/Login";
+import { AuthProvider, useAuth } from "./AuthContext"; // NEW: shares "am I logged in?" with the whole app (replaces peeking at localStorage)
 
 // Every OTHER page is now lazy-loaded: its JavaScript is only downloaded the moment
 // someone actually navigates to that specific route, instead of all ten pages' worth of
@@ -26,9 +27,10 @@ const WordProfile = lazy(() => import("./pages/WordProfile"));
 const SpeakingPractice = lazy(() => import("./pages/SpeakingPractice"));
 
 function ProtectedRoute({ children }) {
-    const token = localStorage.getItem("token"); // same login check as before — unchanged
-    if (!token) return <Navigate to="/" replace />;
-    return children;
+    const { status } = useAuth(); // NEW: the login state comes from AuthContext (the server told it), not from localStorage
+    if (status === "checking") return <PageLoading />; // NEW: still asking the server "is there a valid login cookie?" — show Loading… instead of flashing the login page
+    if (status === "out") return <Navigate to="/" replace />; // NEW: not logged in → go to the sign-in page
+    return children; // logged in → show the protected page
 }
 
 // Shown briefly while a lazy page's code is still being downloaded — normally so fast
@@ -45,6 +47,7 @@ function PageLoading() {
 
 export default function App() {
     return (
+        <AuthProvider>{/* NEW: wraps everything so every page can call useAuth() */}
         <BrowserRouter>
             {/* Suspense wraps ALL the routes in one place — any lazy page rendered below
                 automatically shows PageLoading while its code is still being fetched,
@@ -63,5 +66,6 @@ export default function App() {
                 </Routes>
             </Suspense>
         </BrowserRouter>
+        </AuthProvider>
     );
 }
