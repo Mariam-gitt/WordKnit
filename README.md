@@ -133,6 +133,12 @@ FRONTEND_URL=http://localhost:5173
 # COOKIE_SAMESITE=lax
 # COOKIE_SECURE=false
 
+# max PDF upload size in MB. Default 4, because Vercel rejects request bodies over 4.5 MB. When self-hosting you can raise it.
+# MAX_PDF_MB=11
+
+# how chatty the server log is: debug | info | warn | error | silent (default: info)
+# LOG_LEVEL=info
+
 # optional integrations
 HUBSPOT_PRIVATE_APP_TOKEN=your_hubspot_token
 RESEND_API_KEY=your_resend_key
@@ -150,6 +156,23 @@ Optional Python services:
 python rag_service.py
 python rag_llm_service.py
 ```
+
+### Running the tests
+
+```bash
+cd backend
+npm test
+```
+
+Most tests need no database. The PDF-storage tests need a throw-away MongoDB; they are skipped unless you set `TEST_MONGO_URI`
+(GitHub Actions does this automatically — see `.github/workflows/ci.yml`):
+
+```bash
+TEST_MONGO_URI=mongodb://127.0.0.1:27017/wordknit_test npm test
+```
+
+**Moving old PDFs to the new storage (optional):** PDFs saved before the GridFS change still work. To move them and shrink the database:
+`npm run migrate:pdfs` (dry run, changes nothing) then `npm run migrate:pdfs -- --apply`.
 
 ### 3) Frontend setup
 

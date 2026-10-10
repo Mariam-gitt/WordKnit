@@ -27,6 +27,7 @@ cp backend/.env.docker backend/.env.docker
 Open `backend/.env.docker` and set:
 - `JWT_SECRET`  — any long random string, e.g. `openssl rand -hex 32`
 - `GROQ_API_KEY` — your key from https://console.groq.com
+- `MAX_PDF_MB=11` — optional; the default upload limit is 4 MB (Vercel's limit), but a self-hosted Docker setup can allow bigger PDFs
 - `FRONTEND_URL=http://localhost` — the address you open the app at; the API refuses write requests (POST/PATCH/DELETE) from any other origin
 - `COOKIE_SAMESITE=lax` and `COOKIE_SECURE=false` — the login cookie travels over plain http://localhost here, and frontend + backend share one address through nginx
 
