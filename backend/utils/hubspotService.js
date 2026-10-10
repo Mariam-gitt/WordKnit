@@ -1,3 +1,4 @@
+const logger = require("./logger"); // central logger (levels + timestamps) instead of raw console.log
 const axios = require("axios");
 // axios is already a dependency in this project (used above for Resend) — reusing it here
 // keeps us from adding a new package just for HubSpot.
@@ -18,7 +19,7 @@ const syncContactToHubspot = async (name, email) => {
     if (!process.env.HUBSPOT_PRIVATE_APP_TOKEN) {
         // Guard clause: if no token is configured, skip silently rather than throwing an error —
         // this mirrors how sendWelcomeEmail() checks for RESEND_API_KEY before trying.
-        console.log("[HubSpot] HUBSPOT_PRIVATE_APP_TOKEN not set — skipping contact sync");
+        logger.warn("[HubSpot] HUBSPOT_PRIVATE_APP_TOKEN not set — skipping contact sync");
         return;
         // Exit early; nothing below this line runs.
     }
@@ -63,18 +64,18 @@ const syncContactToHubspot = async (name, email) => {
                 // HubSpot request can't stall registration indefinitely.
             }
         );
-        console.log(`[HubSpot] Contact synced: ${email}`);
+        logger.info("[HubSpot] Contact synced"); // privacy: no email address in the logs
         // Log success so it's visible in server logs during testing/debugging.
     } catch (err) {
         // Runs if the POST request fails for any reason.
         if (err.response?.status === 409) {
             // HTTP 409 = "Conflict" — HubSpot's way of saying a contact with this email already exists.
-            console.log(`[HubSpot] Contact already exists, skipping create: ${email}`);
+            logger.info("[HubSpot] Contact already exists, skipping create"); // privacy: no email address in the logs
             // For now we just log and move on; updating an existing contact can be added later if needed.
             return;
             // Exit early — no need to log the generic error below for this expected case.
         }
-        console.log("[HubSpot] Contact sync failed:", err.response?.data || err.message);
+        logger.error("[HubSpot] Contact sync failed:", err.response?.data || err.message);
         // "?." (optional chaining) avoids crashing if err.response is undefined (e.g. no network at all);
         // falls back to err.message when there's no response body to show.
     }
