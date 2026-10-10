@@ -338,7 +338,10 @@ function PDFReader() {
             setPdfLoaded(true);
         } catch (err) {
             console.log("PDF upload error:", err);
-            setError(err.response?.data?.message || "Failed to save PDF.");
+            // NEW: the hosting platform (Vercel) rejects uploads over about 4.5 MB with a 413 BEFORE our server runs, and its reply has no JSON message, so we write one here.
+            setError(err.response?.status === 413
+                ? "This PDF is too large to upload. Please try a smaller file (under about 4MB)."
+                : (err.response?.data?.message || "Failed to save PDF."));
         } finally {
             setLoading(false);
             setUploading(false);
@@ -355,11 +358,14 @@ function PDFReader() {
         setBookmarks([]);
 
         try {
-            const res = await api.get(`/documents/${doc._id}`);
-            const { fileData, lastPage } = res.data;
-            const binary = atob(fileData);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            // NEW: two requests at the same time (Promise.all): the document's INFO (lastPage) and the PDF's raw BYTES.
+            // Before, one request returned the whole PDF as base64 text inside JSON, which the browser had to decode byte by byte.
+            const [infoRes, fileRes] = await Promise.all([
+                api.get(`/documents/${doc._id}`), // backend → browser: small JSON { fileName, lastPage, pageCount, ... }
+                api.get(`/documents/${doc._id}/file`, { responseType: "arraybuffer" }) // backend → browser: the raw PDF bytes (arraybuffer = "give me the bytes as they are, not as text")
+            ]);
+            const { lastPage } = infoRes.data; // the page the user stopped at last time
+            const bytes = new Uint8Array(fileRes.data); // wrap the raw bytes so pdf.js can read them (no atob / base64 decoding needed any more)
             await openPdfBytes(bytes, lastPage || 1);
         } catch (err) {
             console.log("Open saved PDF error:", err);
