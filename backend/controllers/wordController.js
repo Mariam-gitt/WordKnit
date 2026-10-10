@@ -1,211 +1,8 @@
+const logger = require("../utils/logger"); // central logger (levels + timestamps) instead of raw console.log
 const Word = require("../models/Word"); // per-user saved words (their personal list)
-const WordCache = require("../models/WordCache"); // shared global cache of meanings — one row per unique word, reused by every user
-const axios = require("axios"); // library used to make HTTP requests to dictionaryapi.dev and Groq
-
-// MEANING_VERSION = the "version number" of our recipe for writing meanings.
-// Cached meanings saved by an OLDER recipe have a lower (or missing) number, so getMeaning() treats them as out-of-date and rebuilds them with the new recipe.
-// Bump this number whenever you improve the recipe again and want old cached meanings refreshed.
-const MEANING_VERSION = 2;
-
-/**
- * Get the real dictionary senses (meanings) of a word from dictionaryapi.dev.
- * A "sense" = one specific meaning of a word (e.g. "bank" has the money sense and the river sense).
- * Returns a list of senses, or an empty list if the dictionary is down / doesn't know the word.
- */
-const fetchDictionarySenses = async (word) => {                       // async = this function waits for the internet; "word" is the lowercase word to look up
-    try {                                                              // try/catch = if the request fails, jump to catch instead of crashing the server
-        const response = await axios.get(                              // axios.get = ask another website for data (browser-style GET request)
-            `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`, // encodeURIComponent makes the word safe inside a URL (handles spaces/symbols)
-            { timeout: 5000 }                                          // give up after 5 seconds because this free API can be slow
-        );
-        const senses = [];                                             // we will collect every sense we find in this list
-        for (const entry of response.data || []) {                     // the API returns a list of "entries" (one per word form); loop over each one
-            for (const block of entry.meanings || []) {                // each entry has "meanings" blocks, one per part of speech (noun, verb, ...)
-                for (const def of (block.definitions || []).slice(0, 3)) { // each block has definitions; keep only the first 3 per part of speech so the list stays short
-                    if (def.definition) {                              // skip any empty definition
-                        senses.push({                                  // add one sense to our list as a small object
-                            partOfSpeech: block.partOfSpeech || "",    // noun / verb / adjective ... (empty text if missing)
-                            definition: def.definition,                // the dictionary's own wording
-                            example: def.example || "",                // the dictionary's example sentence, if it has one
-                            synonyms: def.synonyms || []               // the dictionary's synonyms, if it has any
-                        });
-                    }
-                }
-            }
-        }
-        return senses.slice(0, 8);                                     // keep at most 8 senses overall so the AI prompt doesn't get too long
-    } catch (err) {                                                    // covers: word not found (404), API down, timeout, rate limit
-        console.log(`[Dictionary API] Failed for "${word}":`, err.response?.status || err.message); // log why, to help debugging
-        return [];                                                     // an empty list means "the dictionary couldn't help"
-    }
-};
-
-/**
- * Ask Groq (an AI service) to WRITE the meaning of a word in one simple style.
- * If we have real dictionary senses, the AI must choose from THEM (so it can't make things up).
- * If the dictionary gave us nothing, the AI writes the meaning on its own.
- * Returns null on any failure so the caller can use a fallback.
- */
-const generateMeaningWithGroq = async (word, senses = []) => {        // senses = the list from fetchDictionarySenses (can be empty)
-    if (!process.env.GROQ_API_KEY) return null;                        // no API key set = we can't call Groq, so stop here
-
-    const senseText = senses                                           // turn the senses list into numbered lines of text for the prompt
-        .map((s, i) => `${i + 1}. (${s.partOfSpeech || "?"}) ${s.definition}`) // e.g. "1. (noun) a financial institution"
-        .join("\n");                                                   // put each sense on its own line
-
-    const rules = `Your job:
-- Choose the MOST COMMON everyday sense of the word (the one a learner is most likely to meet).
-- Write its meaning as ONE simple sentence (maximum 20 words) in plain English. Do not use the word itself inside the meaning.
-- Give the part of speech of that sense (noun, verb, adjective, adverb, ...).
-- Give ONE natural example sentence that uses the word in that same sense.
-- Give up to 3 synonyms.`;                                            // the same instructions are used whether or not we have dictionary senses
-
-    const prompt = senses.length                                       // choose the prompt: with dictionary senses, or without
-        ? `You are writing the meaning of an English word for a vocabulary-learning app.
-
-Word: "${word}"
-
-Real dictionary senses (use ONLY these as your source of truth, do not invent a new meaning):
-${senseText}
-
-${rules}
-
-Reply with JSON only, in exactly this shape:
-{ "meaning": "...", "partOfSpeech": "...", "exampleSentence": "...", "synonyms": ["...", "...", "..."] }
-If "${word}" is not a real English word, reply: { "meaning": null }`
-        : `You are writing the meaning of an English word for a vocabulary-learning app.
-
-Word: "${word}"
-
-${rules}
-
-Reply with JSON only, in exactly this shape:
-{ "meaning": "...", "partOfSpeech": "...", "exampleSentence": "...", "synonyms": ["...", "...", "..."] }
-If "${word}" is not a real English word (for example a typo), reply: { "meaning": null }`;
-
-    try {                                                              // try/catch so a Groq failure returns null instead of crashing
-        const groqRes = await axios.post(                              // axios.post = send data to another website
-            "https://api.groq.com/openai/v1/chat/completions",         // Groq's chat endpoint
-            {
-                model: "openai/gpt-oss-120b",                          // the AI model used everywhere else in this app
-                messages: [{ role: "user", content: prompt }],         // our prompt, sent as the user's message
-                temperature: 0.3,                                      // low temperature = steady, less "creative" answers (good for definitions)
-                max_tokens: 600                                        // room for the answer (a bit higher than before, since the prompt is longer)
-            },
-            {
-                headers: {
-                    "Authorization": `Bearer ${process.env.GROQ_API_KEY}`, // proves we're allowed to use Groq (key lives in .env, never in code)
-                    "Content-Type": "application/json"                 // tells Groq we're sending JSON
-                },
-                timeout: 10000                                         // give up after 10 seconds
-            }
-        );
-
-        const content = groqRes.data.choices[0].message.content.trim(); // the AI's reply text, with spaces trimmed off
-        const cleaned = content.replace(/```json|```/g, "").trim();    // remove ```json fences if the AI added them, so JSON.parse can read it
-        const parsed = JSON.parse(cleaned);                            // JSON = text format for data; JSON.parse turns the text into a real JS object
-
-        if (typeof parsed.meaning !== "string" || parsed.meaning.trim() === "") return null; // null / empty meaning = "not a real word" (or a bad reply), so report failure
-        return {                                                       // the clean result we hand back to getMeaning
-            meaning: parsed.meaning.trim(),                            // the simple one-sentence meaning
-            partOfSpeech: (parsed.partOfSpeech || "").toString().trim().toLowerCase(), // noun / verb / ... in lowercase, empty text if missing
-            exampleSentence: parsed.exampleSentence || "No example available", // example sentence, with the same placeholder the app already uses
-            synonyms: Array.isArray(parsed.synonyms) ? parsed.synonyms.slice(0, 3) : [], // keep only a real list, at most 3
-            source: senses.length ? "Dictionary + AI" : "AI Generated" // remember where this meaning came from
-        };
-    } catch (err) {                                                    // network error, timeout, or the AI sent text that isn't valid JSON
-        console.log(`[Groq meaning] Failed for "${word}":`, err.response?.data || err.message); // log why
-        return null;                                                   // tell the caller "this step failed"
-    }
-};
-
-/**
- * Find the meaning of a word. The order of steps:
- *   0. our shared cache (only if it was made with the CURRENT recipe)
- *   1. real dictionary senses  →  2. AI picks the most common sense and rewrites it simply
- *   3. if the AI fails: an older cached meaning, or the dictionary's first sense
- *   4. nothing worked: "No meaning found"
- * options.forceRefresh = true skips the cache so the meaning is rebuilt from scratch (used by "Regenerate").
- */
-const getMeaning = async (word, options = {}) => {                     // options = optional extra settings; {} means "none given" (so old callers like ocrRoutes still work)
-    const forceRefresh = options.forceRefresh === true;                // true only when the caller explicitly asks for a rebuild
-    let staleCache = null;                                             // will hold an older cached meaning, kept as a safety net
-
-    // ── Step 0: our own shared cache ──
-    if (!forceRefresh) {                                               // normal lookups use the cache; "Regenerate" skips it
-        const cached = await WordCache.findOne({ word }).lean();       // one DB read: is this word already cached? (.lean() = plain object, read-only)
-        if (cached && cached.meaningVersion === MEANING_VERSION) {     // cached AND made with the current recipe = good enough to use
-            return {                                                   // hand back the cached meaning straight away
-                meaning: cached.meaning,
-                partOfSpeech: cached.partOfSpeech || "",
-                exampleSentence: cached.exampleSentence,
-                synonyms: cached.synonyms,
-                source: cached.source
-            };
-        }
-        staleCache = cached || null;                                   // an out-of-date entry (or null): keep it in case everything else fails
-    }
-
-    // ── Step 1: get ALL real dictionary senses (not just the first one) ──
-    const senses = await fetchDictionarySenses(word);                  // may be an empty list if the dictionary is down
-
-    // ── Step 2: let the AI choose the most common sense and rewrite it simply ──
-    const aiMeaning = await generateMeaningWithGroq(word, senses);     // works with or without senses
-    if (aiMeaning) {                                                   // the AI gave a good answer
-        await cacheMeaning(word, aiMeaning);                           // save it for every user (this also replaces any old cached entry)
-        return aiMeaning;                                              // done
-    }
-
-    // ── Step 3: the AI failed, so use the best safety net we have ──
-    if (staleCache) {                                                  // an older cached meaning exists
-        return {                                                       // better than nothing, and we do NOT re-save it as "current"
-            meaning: staleCache.meaning,
-            partOfSpeech: staleCache.partOfSpeech || "",
-            exampleSentence: staleCache.exampleSentence,
-            synonyms: staleCache.synonyms,
-            source: staleCache.source
-        };
-    }
-    if (senses.length) {                                               // the dictionary worked, only the AI failed
-        return {                                                       // use the dictionary's first sense (the old behaviour); NOT cached, so next time we retry the AI
-            meaning: senses[0].definition,
-            partOfSpeech: senses[0].partOfSpeech || "",
-            exampleSentence: senses[0].example || "No example available",
-            synonyms: senses[0].synonyms || [],
-            source: "Free Dictionary API"
-        };
-    }
-
-    // ── Step 4: nothing worked ──
-    return {                                                           // deliberately NOT cached, so we try again next time
-        meaning: "No meaning found — try checking the spelling or add your own note.",
-        partOfSpeech: "",
-        exampleSentence: "No example available",
-        synonyms: [],
-        source: "Not found"
-    };
-};
-
-/**
- * Saves a successfully-found meaning into the shared cache so every future
- * lookup of this word — by ANY user — is an instant DB read instead of a
- * fresh network call. Swallows its own errors on purpose: if the cache
- * write fails for some reason, the user should still get their definition:
- * we don't want a caching bug to break the actual feature.
- */
-const cacheMeaning = async (word, result) => {
-    try {
-        // upsert: true means "create it if it doesn't exist yet" — safe even if two
-        // requests for the same brand-new word land at almost the same time
-        await WordCache.findOneAndUpdate(
-            { word },
-            { word, ...result, meaningVersion: MEANING_VERSION }, // NEW: stamp the entry with the current recipe version so old entries are recognised as stale
-            { upsert: true }
-        );
-    } catch (err) {
-        console.log(`[Cache] Failed to save "${word}":`, err.message);
-    }
-};
+const { getMeaning } = require("../services/meaningService"); // NEW: dictionary / cache / Groq logic moved to a service
+const { generateSimilarDecoys, pickWeightedWord } = require("../services/quizService"); // NEW: quiz decoys + weighted word pick moved to a service
+const { applyAnswer } = require("../services/reviewService"); // NEW: streak / learned scoring rules moved to a service
 
 // Exported so other files (currently ocrRoutes.js) can reuse the exact same lookup
 // chain — cache, then dictionary API, then Groq — instead of duplicating it.
@@ -218,7 +15,7 @@ exports.getMeaning = getMeaning;
 exports.addWord = async (req, res) => {
     try {
         const userId = req.user;
-        console.log("ADD WORD - userId:", userId);
+        logger.debug("ADD WORD - userId:", userId);
 
         const { word } = req.body;
 
@@ -262,7 +59,7 @@ exports.addWord = async (req, res) => {
         res.status(201).json(newWord);
 
     } catch (error) {
-        console.log("ADD WORD ERROR:", error.response?.data || error.message);
+        logger.error("ADD WORD ERROR:", error.response?.data || error.message);
         // res.status(500).json({ message: "Failed to add word" });
         res.status(500).json({
     message: "Failed to add word",
@@ -283,7 +80,7 @@ exports.getWords = async (req, res) => {
         const words = await Word.find({ userId: req.user }).sort({ createdAt: -1 }).lean();
         res.status(200).json(words);
     } catch (error) {
-        console.log("GET WORDS ERROR:", error.message);
+        logger.error("GET WORDS ERROR:", error.message);
         res.status(500).json({ message: "Failed to fetch words" });
     }
 };
@@ -310,104 +107,15 @@ exports.previewMeaning = async (req, res) => {
 
         res.status(200).json({ word, meaning, partOfSpeech, exampleSentence, synonyms, source }); // NEW: send partOfSpeech to the browser too
     } catch (error) {
-        console.log("PREVIEW MEANING ERROR:", error.message);
+        logger.error("PREVIEW MEANING ERROR:", error.message);
         res.status(500).json({ message: "Failed to look up word" });
     }
 };
 
 
 /**
- * Ask Groq for 3 plausible-but-wrong meanings of `word`, written in the
- * same style/length as a real dictionary definition, each with a short
- * reason why it's wrong. Falls back to null on any failure so the caller
- * can use the old same-vocab-list method instead.
- */
-const generateSimilarDecoys = async (word, correctMeaning, partOfSpeech = "") => { // NEW: partOfSpeech (optional) lets wrong options match the right answer's type of word
-    if (!process.env.GROQ_API_KEY) return null;
-
-    const prompt = `You are building a vocabulary quiz. The word is "${word}" and its correct meaning is:
-"${correctMeaning}"
-
-Write 3 INCORRECT but PLAUSIBLE dictionary-style definitions for "${word}" — the kind of wrong answers that would actually trick someone who half-remembers the word. Match the length and tone of the correct meaning.${partOfSpeech ? ` Every wrong option must also describe a ${partOfSpeech}, just like the correct meaning.` : ""} Do not just negate the correct meaning; invent a different, believable concept.
-
-For each wrong option, also give a short reason (max 16 words) explaining why it's wrong — ideally by naming what real word or concept that wrong meaning actually belongs to.
-
-Respond in this exact JSON format, nothing else:
-{
-  "wrongOptions": [
-    { "meaning": "...", "reason": "..." },
-    { "meaning": "...", "reason": "..." },
-    { "meaning": "...", "reason": "..." }
-  ]
-}`;
-
-    try {
-        const groqRes = await axios.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            {
-                // llama-3.3-70b-versatile was shut down by Groq on Aug 16 2026 — switched
-                // to its recommended replacement to match the rest of the codebase.
-                model: "openai/gpt-oss-120b",
-                messages: [{ role: "user", content: prompt }],
-                temperature: 0.8,
-                max_tokens: 400
-            },
-            {
-                headers: {
-                    "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
-                    "Content-Type": "application/json"
-                },
-                timeout: 12000
-            }
-        );
-
-        const content = groqRes.data.choices[0].message.content.trim();
-        const cleaned = content.replace(/```json|```/g, "").trim();
-        const parsed = JSON.parse(cleaned);
-
-        if (!Array.isArray(parsed.wrongOptions) || parsed.wrongOptions.length < 3) return null;
-        return parsed.wrongOptions.slice(0, 3);
-
-    } catch (err) {
-        console.log("QUIZ DECOY GENERATION FAILED:", err.response?.data || err.message);
-        return null;
-    }
-};
-
-/**
  * GENERATE QUIZ
  */
-/**
- * How many raffle tickets a word gets when the quiz picks the next question.
- * More tickets = more likely to be picked sooner. In plain words:
- *   - a word you are still learning gets 3 tickets, a "learned" word only 1
- *   - each past mistake adds 1 ticket (at most 4)...
- *   - ...but each right answer in a row takes 1 ticket back, so a word you fixed stops being "weak"
- * Examples: brand-new word = 3 | failed 4 times, 0 right since = 7 | learned, no recent mistakes = 1
- */
-const ticketsFor = (w) => {                                           // w = one saved word (a plain object, because getQuiz uses .lean())
-    const wrong = w.wrongCount || 0;                                   // .lean() skips schema defaults, so a missing number must be treated as 0
-    const streak = w.correctStreak || 0;                               // right answers in a row (0 if the word was never practised)
-    const base = w.status === "learned" ? 1 : 3;                       // learned words need less practice than words still in "review"
-    const weakBonus = Math.max(0, Math.min(wrong, 4) - streak);        // each mistake adds a ticket (max 4), each right-in-a-row removes one, never below 0
-    return base + weakBonus;                                           // total tickets for this word
-};
-
-/**
- * Pick ONE word from the list using the raffle: every ticket has the same chance,
- * so a word with 7 tickets is 7 times as likely as a word with 1 ticket.
- */
-const pickWeightedWord = (list) => {                                  // list = the words still allowed to be asked
-    const tickets = list.map(ticketsFor);                              // one ticket count per word, in the same order as the list
-    const totalTickets = tickets.reduce((sum, t) => sum + t, 0);       // add them all up = the size of the raffle drum
-    let draw = Math.random() * totalTickets;                           // a random point inside the drum (0 up to totalTickets)
-    for (let i = 0; i < list.length; i++) {                            // walk through the words one by one
-        draw -= tickets[i];                                            // use up this word's tickets
-        if (draw < 0) return list[i];                                  // the draw landed inside this word's tickets, so this is the winner
-    }
-    return list[list.length - 1];                                      // safety net (only reached through tiny rounding), pick the last word
-};
-
 exports.getQuiz = async (req, res) => {
     try {
         // .lean() here too — this data is only read to build quiz questions, never saved back.
@@ -469,7 +177,7 @@ exports.getQuiz = async (req, res) => {
         });
 
     } catch (error) {
-        console.log("QUIZ ERROR:", error.message);
+        logger.error("QUIZ ERROR:", error.message);
         res.status(500).json({ message: "Failed to generate quiz" });
     }
 };
@@ -546,15 +254,12 @@ exports.regenerateMeaning = async (req, res) => {                      // runs w
 
         res.status(200).json(saved);                                   // send the updated word back to the browser
     } catch (error) {                                                  // anything unexpected
-        console.log("REGENERATE MEANING ERROR:", error.message);       // log it for debugging
+        logger.error("REGENERATE MEANING ERROR:", error.message);       // log it for debugging
         res.status(500).json({ message: "Failed to regenerate meaning" }); // 500 = server error
     }
 };
 
 
-// LEARNED_AFTER = how many right answers IN A ROW turn a word into "learned".
-// Change this one number to make the rule easier (2) or stricter (5).
-const LEARNED_AFTER = 3;
 
 /**
  * RECORD A REVIEW — saves the result of ONE quiz answer (or flashcard rating) on the word's scorecard.
@@ -591,18 +296,8 @@ exports.recordReview = async (req, res) => {                           // runs w
 
         const wasLearned = word.status === "learned";                  // remember the old status so we can tell the browser if it changed
 
-        word.lastReviewed = new Date();                                // stamp "practised just now"
-        if (correct) {                                                 // RIGHT answer
-            word.correctCount += 1;                                    // total right answers goes up
-            word.correctStreak += 1;                                   // right answers in a row goes up
-            if (word.correctStreak >= LEARNED_AFTER) {                 // enough in a row?
-                word.status = "learned";                               // the word is now learned
-            }
-        } else {                                                       // WRONG answer
-            word.wrongCount += 1;                                      // total wrong answers goes up
-            word.correctStreak = 0;                                    // the streak starts again from zero
-            word.status = "review";                                    // back to "review" (even if the user had marked it learned by hand)
-        }
+        applyAnswer(word, correct);                                    // NEW: the scoring rules now live in services/reviewService.js (stamp date, streaks, learned / back to review)
+
         await word.save();                                             // write the updated scorecard to MongoDB
 
         res.status(200).json({                                         // tell the browser what happened (server → browser)
@@ -615,7 +310,7 @@ exports.recordReview = async (req, res) => {                           // runs w
             backToReview: wasLearned && word.status === "review"       // true only if this answer just sent it back to review
         });
     } catch (error) {                                                  // anything unexpected
-        console.log("RECORD REVIEW ERROR:", error.message);            // log it for debugging
+        logger.error("RECORD REVIEW ERROR:", error.message);            // log it for debugging
         res.status(500).json({ message: "Failed to record review" });  // 500 = server error
     }
 };

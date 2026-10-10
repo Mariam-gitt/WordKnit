@@ -180,6 +180,7 @@
 
 
 
+const logger = require("../utils/logger"); // central logger (levels + timestamps) instead of raw console.log
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -220,7 +221,7 @@ const escapeHtml = (text) => String(text)
  */
 const sendWelcomeEmail = async (name, email) => {
     if (!process.env.RESEND_API_KEY) {
-        console.log("[Email] RESEND_API_KEY not set — skipping welcome email");
+        logger.warn("[Email] RESEND_API_KEY not set — skipping welcome email");
         return;
     }
     try {
@@ -249,9 +250,9 @@ const sendWelcomeEmail = async (name, email) => {
                 timeout: 8000
             }
         );
-        console.log(`[Email] Welcome email sent to ${email}`);
+        logger.info("[Email] Welcome email sent"); // privacy: the address itself is no longer written to the logs
     } catch (err) {
-        console.log("[Email] Failed to send welcome email:", err.response?.data || err.message);
+        logger.error("[Email] Failed to send welcome email:", err.response?.data || err.message);
     }
 };
 
@@ -311,7 +312,7 @@ exports.register = async (req, res) => {
             return res.status(400).json({ message: "User already exists" });
         }
         // SECURITY: log the REAL error on the server only (for you to debug)...
-        console.log("REGISTER ERROR:", error.message);
+        logger.error("REGISTER ERROR:", error.message);
         // ...and send the user a generic message, so internal details (database or library errors) never leak to the browser.
         res.status(500).json({ message: "Registration failed. Please try again." });
     }
@@ -342,7 +343,7 @@ exports.login = async (req, res) => {
 
     } catch (error) {
         // SECURITY: log the real reason on the server, but send the user a generic message so internal details never leak.
-        console.log("LOGIN ERROR:", error.message);
+        logger.error("LOGIN ERROR:", error.message);
         res.status(500).json({ message: "Login failed. Please try again." });
     }
 };
@@ -360,6 +361,11 @@ exports.deleteAccount = async (req, res) => {
         const Bookmark = require("../models/Bookmark");
         const SpeakingSession = require("../models/SpeakingSession"); // NEW: speaking sessions were being left behind after account deletion
 
+        // NEW: first remove the stored PDF files (GridFS) of this user's documents, otherwise their bytes would be left behind forever.
+        const { deletePdf } = require("../utils/pdfStorage");
+        const pdfDocs = await Document.find({ userId, fileId: { $exists: true } }).select("fileId").lean();
+        await Promise.all(pdfDocs.map((d) => deletePdf(d.fileId)));
+
         // Delete all user data in parallel
         await Promise.all([
             SpeakingSession.deleteMany({ userId }), // NEW: remove this user's speaking-practice history too
@@ -373,7 +379,7 @@ exports.deleteAccount = async (req, res) => {
         res.json({ message: "Account deleted" });
 
     } catch (error) {
-        console.log("DELETE ACCOUNT ERROR:", error.message);
+        logger.error("DELETE ACCOUNT ERROR:", error.message);
         res.status(500).json({ message: "Failed to delete account" });
     }
 };
@@ -396,7 +402,7 @@ exports.me = async (req, res) => {
         res.json({ user: user.name });
     } catch (error) {
         // Log the real error on the server only; the user gets a generic message.
-        console.log("ME ERROR:", error.message);
+        logger.error("ME ERROR:", error.message);
         res.status(500).json({ message: "Could not check your session" });
     }
 };

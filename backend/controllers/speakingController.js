@@ -1,4 +1,5 @@
 // axios: makes the outgoing HTTP requests to Groq's three separate endpoints
+const logger = require("../utils/logger"); // central logger (levels + timestamps) instead of raw console.log
 const axios = require("axios");
 // form-data: builds a real multipart/form-data request body — the format file uploads
 // need. Node doesn't have a built-in equivalent that axios can reliably send, so this
@@ -387,7 +388,7 @@ exports.startConversation = async (req, res) => {
             level
         });
     } catch (error) {
-        console.log("START CONVERSATION ERROR:", error.response?.data || error.message);
+        logger.error("START CONVERSATION ERROR:", error.response?.data || error.message);
         res.status(500).json({ message: "Couldn't start the conversation — try again" });
     }
 };
@@ -476,7 +477,7 @@ exports.handleTurn = async (req, res) => {
                     { $push: { transcript: { $each: [{ role: "user", content: userText }, { role: "assistant", content: replyText }] } } }
                 );
             } catch (dbError) {
-                console.log("SPEAKING TURN — session save failed (turn itself still succeeded):", dbError.message);
+                logger.error("SPEAKING TURN — session save failed (turn itself still succeeded):", dbError.message);
             }
         }
 
@@ -487,7 +488,7 @@ exports.handleTurn = async (req, res) => {
             history
         });
     } catch (error) {
-        console.log("SPEAKING TURN ERROR:", error.response?.data || error.message);
+        logger.error("SPEAKING TURN ERROR:", error.response?.data || error.message);
         res.status(500).json({ message: "Something went wrong during that turn — try again" });
     }
 };
@@ -526,7 +527,7 @@ exports.endSession = async (req, res) => {
 
         res.status(200).json({ reflection });
     } catch (error) {
-        console.log("END SESSION ERROR:", error.response?.data || error.message);
+        logger.error("END SESSION ERROR:", error.response?.data || error.message);
         res.status(500).json({ message: "Couldn't generate feedback for this session — try again" });
     }
 };
@@ -557,7 +558,7 @@ exports.getSessions = async (req, res) => {
             preview: s.transcript[0]?.content?.slice(0, 80) || ""
         })));
     } catch (error) {
-        console.log("GET SESSIONS ERROR:", error.message);
+        logger.error("GET SESSIONS ERROR:", error.message);
         res.status(500).json({ message: "Couldn't load your speaking history" });
     }
 };
@@ -581,7 +582,7 @@ exports.getSessionById = async (req, res) => {
             reflection: session.reflection
         });
     } catch (error) {
-        console.log("GET SESSION BY ID ERROR:", error.message);
+        logger.error("GET SESSION BY ID ERROR:", error.message);
         res.status(500).json({ message: "Couldn't load that session" });
     }
 };
@@ -595,7 +596,7 @@ exports.deleteSession = async (req, res) => {
         if (!deleted) return res.status(404).json({ message: "Session not found" });
         res.status(200).json({ message: "Session deleted" });
     } catch (error) {
-        console.log("DELETE SESSION ERROR:", error.message);
+        logger.error("DELETE SESSION ERROR:", error.message);
         res.status(500).json({ message: "Couldn't delete that session" });
     }
 };
@@ -609,7 +610,7 @@ exports.deleteAllSessions = async (req, res) => {
         await SpeakingSession.deleteMany({ userId: req.user });
         res.status(200).json({ message: "All sessions deleted" });
     } catch (error) {
-        console.log("DELETE ALL SESSIONS ERROR:", error.message);
+        logger.error("DELETE ALL SESSIONS ERROR:", error.message);
         res.status(500).json({ message: "Couldn't clear your speaking history" });
     }
 };
@@ -623,7 +624,7 @@ exports.getLevel = async (req, res) => {
         const user = await User.findById(req.user).select("speakingLevel").lean();
         res.status(200).json({ level: user?.speakingLevel || "intermediate" });
     } catch (error) {
-        console.log("GET LEVEL ERROR:", error.message);
+        logger.error("GET LEVEL ERROR:", error.message);
         res.status(500).json({ message: "Couldn't load your level setting" });
     }
 };
@@ -640,7 +641,7 @@ exports.setLevel = async (req, res) => {
         await User.findByIdAndUpdate(req.user, { speakingLevel: level });
         res.status(200).json({ level });
     } catch (error) {
-        console.log("SET LEVEL ERROR:", error.message);
+        logger.error("SET LEVEL ERROR:", error.message);
         res.status(500).json({ message: "Couldn't save your level setting" });
     }
 };
