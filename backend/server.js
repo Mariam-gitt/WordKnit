@@ -1,13 +1,15 @@
+const logger = require("./utils/logger"); // central logger (levels + timestamps) instead of raw console.log
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet"); // adds protective security headers to every response
 const cookieParser = require("cookie-parser"); // reads the Cookie header the browser sends and puts the values in req.cookies
+const { notFound, errorHandler } = require("./middleware/errorHandler"); // NEW: one central place for "no such route" and "something crashed" answers
 const { requireAllowedOrigin } = require("./middleware/originCheck"); // CSRF defence: blocks state-changing requests that come from other websites
 const dotenv = require("dotenv");
 const connectDB = require("./config/db");
 const { aiLimiter } = require("./middleware/rateLimiters"); // SECURITY: limits how often the paid-AI routes can be called
 
-dotenv.config();
+dotenv.config({ quiet: process.env.NODE_ENV === "test" }); // "quiet" hides dotenv's start-up banner while automated tests run
 
 const app = express();
 
@@ -31,7 +33,7 @@ const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
 
 // If this is the live server and FRONTEND_URL was forgotten, the deployed frontend would be blocked — warn loudly in the logs.
 if (process.env.NODE_ENV === "production" && !process.env.FRONTEND_URL) {
-    console.warn("WARNING: FRONTEND_URL is not set — the deployed frontend will be blocked by CORS.");
+    logger.warn("WARNING: FRONTEND_URL is not set — the deployed frontend will be blocked by CORS.");
 }
 
 const corsOptions = {
@@ -129,9 +131,16 @@ app.use("/api/profile", require("./routes/wordProfileRoutes"));
 app.use("/api/documents", require("./routes/documentRoutes"));
 app.use("/api/bookmarks", require("./routes/bookmarkRoutes"));
 
-if (process.env.NODE_ENV !== "production") {
+// NEW: these two MUST come after every route. If no route matched → notFound (404). If any route threw an error → errorHandler (one place, one JSON shape).
+app.use(notFound);
+app.use(errorHandler);
+
+// NEW: require.main === module is true ONLY when you start this file directly (node server.js, npm start, Docker).
+// It is false when another file imports server.js — which is what Vercel does, and what the automated tests do — so the server doesn't start listening twice.
+// (Before, the check was NODE_ENV !== "production", which meant the Docker backend — it sets NODE_ENV=production — never started listening at all.)
+if (require.main === module) {
     const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => console.log(`Local server running on port ${PORT}`));
+    app.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
 }
 
 module.exports = app;
