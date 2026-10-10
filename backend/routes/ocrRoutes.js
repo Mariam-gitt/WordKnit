@@ -1,3 +1,4 @@
+const logger = require("../utils/logger"); // central logger (levels + timestamps) instead of raw console.log
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
@@ -79,7 +80,7 @@ router.post("/extract", protect, upload.single("image"), async (req, res) => {
                 added.push(newWord);
 
             } catch (err) {
-                console.log(`OCR: failed to add "${word}":`, err.message);
+                logger.error(`OCR: failed to add "${word}":`, err.message);
                 skipped.push(word);
             }
         }
@@ -94,7 +95,7 @@ router.post("/extract", protect, upload.single("image"), async (req, res) => {
         });
 
     } catch (err) {
-        console.log("OCR ROUTE ERROR:", err.message);
+        logger.error("OCR ROUTE ERROR:", err.message);
         if (err.code === "ECONNREFUSED") {
             return res.status(500).json({
                 message: "Couldn't reach the OCR service — check that OCR_SERVICE_URL is correct and the service is running"

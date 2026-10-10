@@ -1,3 +1,4 @@
+const logger = require("../utils/logger"); // central logger (levels + timestamps) instead of raw console.log
 const express = require("express");
 const router = express.Router();
 const axios = require("axios");
@@ -34,7 +35,7 @@ router.post("/upload", protect, upload.single("pdf"), async (req, res) => {
         res.json(ragRes.data);
 
     } catch (err) {
-        console.log("RAG-LLM UPLOAD ERROR:", err.message);
+        logger.error("RAG-LLM UPLOAD ERROR:", err.message);
         if (err.code === "ECONNREFUSED") {
             return res.status(500).json({ message: "RAG-LLM service not running. Start with: python rag_llm_service.py" });
         }
@@ -139,7 +140,7 @@ Only respond with JSON, nothing else.`;
     // }
 
     }catch (err) {
-    console.log("RAG-LLM ASK ERROR:", err.response?.data || err.message);
+    logger.error("RAG-LLM ASK ERROR:", err.response?.data || err.message);
 
     if (err.code === "ECONNREFUSED") {
         return res.status(500).json({

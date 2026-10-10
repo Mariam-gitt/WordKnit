@@ -1,3 +1,4 @@
+const logger = require("../utils/logger"); // central logger (levels + timestamps) instead of raw console.log
 const express = require("express");
 const router = express.Router();
 const axios = require("axios");
@@ -62,7 +63,7 @@ Only respond with the JSON, nothing else.`;
         res.json(parsed);
 
     } catch (err) {
-        console.log("GROQ ERROR:", err.response?.data || err.message);
+        logger.error("GROQ ERROR:", err.response?.data || err.message);
 
         if (err.response?.status === 401) {
             return res.status(401).json({ message: "Invalid Groq API key. Check your .env file." });

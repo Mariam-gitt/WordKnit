@@ -1,9 +1,12 @@
+const logger = require("../utils/logger"); // central logger (levels + timestamps) instead of raw console.log
 const express  = require("express");
 const router   = express.Router();
 const multer   = require("multer");
 const protect  = require("../middleware/authMiddleware");
 const Word     = require("../models/Word");
 const Document = require("../models/Document");
+const { readPdf } = require("../utils/pdfStorage"); // NEW: reads the PDF bytes from GridFS (or from the old base64 field)
+const { validateParams } = require("../middleware/validate"); // checks that the :documentId in the URL looks like a real MongoDB id
 
 // 20MB cap on raw PDF uploads here — generous for text-based academic PDFs,
 // while still protecting the server from runaway memory use on huge scans.
@@ -153,7 +156,7 @@ async function analyzeBuffer(buf, knownSet) {
     let pdfData;
     try { pdfData = await pdfParse(buf, { max: MAX_PAGES }); }
     catch (e) {
-        console.log("pdf-parse error:", e.message);
+        logger.error("pdf-parse error:", e.message);
         return { error: "Could not parse this PDF. It may be password-protected or corrupted." };
     }
 
@@ -211,7 +214,7 @@ async function analyzeBuffer(buf, knownSet) {
 
     const words = scored.map(w => w.word);
 
-    console.log(`[Difficulty] ${totalTokens} tokens → ${Object.keys(freqMap).length} unique → ${words.length} difficult${truncated ? " (truncated)" : ""}`);
+    logger.info(`[Difficulty] ${totalTokens} tokens → ${Object.keys(freqMap).length} unique → ${words.length} difficult${truncated ? " (truncated)" : ""}`);
 
     return {
         words,
@@ -244,8 +247,8 @@ router.post("/analyze-difficulty", protect, upload.single("pdf"), async (req, re
         res.json(result);
 
     } catch (err) {
-        console.log("ANALYZE-DIFFICULTY ERROR:", err.message);
-        res.status(500).json({ message: `Analysis failed: ${err.message}` });
+        logger.error("ANALYZE-DIFFICULTY ERROR:", err.message);
+        res.status(500).json({ message: "Analysis failed. Please try again." }); // the real error is in the server log, not sent to the browser
     }
 });
 
@@ -255,12 +258,12 @@ router.post("/analyze-difficulty", protect, upload.single("pdf"), async (req, re
    library — used by the PDF Reader sidebar so there's no need
    to re-upload the file you already have open.
 ────────────────────────────────────────────────────────── */
-router.get("/analyze-difficulty/:documentId", protect, async (req, res) => {
+router.get("/analyze-difficulty/:documentId", protect, validateParams("documentId"), async (req, res) => {
     try {
-        const doc = await Document.findOne({ _id: req.params.documentId, userId: req.user });
+        const doc = await Document.findOne({ _id: req.params.documentId, userId: req.user }).select("+fileData"); // "+fileData" = also load the hidden legacy base64 field (old documents)
         if (!doc) return res.status(404).json({ message: "PDF not found in your library" });
 
-        const buf = Buffer.from(doc.fileData, "base64");
+        const buf = await readPdf(doc); // NEW: works for both storage layouts
 
         const existingWords = await Word.find({ userId: req.user }, "word").lean();
         const knownSet = new Set(existingWords.map(w => lemmatize(w.word.toLowerCase())));
@@ -271,8 +274,8 @@ router.get("/analyze-difficulty/:documentId", protect, async (req, res) => {
         res.json(result);
 
     } catch (err) {
-        console.log("ANALYZE-DIFFICULTY (saved doc) ERROR:", err.message);
-        res.status(500).json({ message: `Analysis failed: ${err.message}` });
+        logger.error("ANALYZE-DIFFICULTY (saved doc) ERROR:", err.message);
+        res.status(500).json({ message: "Analysis failed. Please try again." }); // the real error is in the server log, not sent to the browser
     }
 });
 

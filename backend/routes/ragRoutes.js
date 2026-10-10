@@ -1,3 +1,4 @@
+const logger = require("../utils/logger"); // central logger (levels + timestamps) instead of raw console.log
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
@@ -30,7 +31,7 @@ router.post("/ingest", protect, upload.single("pdf"), async (req, res) => {
         res.json(ragRes.data);
 
     } catch (error) {
-        console.log("RAG INGEST ERROR:", error.message);
+        logger.error("RAG INGEST ERROR:", error.message);
         if (error.code === "ECONNREFUSED") {
             return res.status(500).json({ message: "RAG service not running. Start with: python rag_service.py" });
         }

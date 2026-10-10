@@ -1,3 +1,4 @@
+const logger = require("../utils/logger"); // central logger (levels + timestamps) instead of raw console.log
 const express = require("express");
 const router = express.Router();
 const axios = require("axios");
@@ -77,7 +78,7 @@ router.get("/:word", protect, async (req, res) => {
                 profile.relatedWords = [...new Set(profile.relatedWords)].slice(0, 10);
             }
         } catch (err) {
-            console.log(`[Profile] Dictionary API failed:`, err.message);
+            logger.error(`[Profile] Dictionary API failed:`, err.message);
         }
 
         // ── 2. Wikipedia — smarter academic source detection ──
@@ -209,14 +210,14 @@ Respond ONLY in this exact JSON format:
                 }
 
             } catch (err) {
-                console.log(`[Profile] Groq failed:`, err.message);
+                logger.error(`[Profile] Groq failed:`, err.message);
             }
         }
 
         res.json(profile);
 
     } catch (err) {
-        console.log("PROFILE ERROR:", err.message);
+        logger.error("PROFILE ERROR:", err.message);
         res.status(500).json({ message: "Failed to load word profile" });
     }
 });

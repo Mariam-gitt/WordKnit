@@ -1,3 +1,4 @@
+const logger = require("../utils/logger"); // central logger (levels + timestamps) instead of raw console.log
 const express  = require("express");
 const router   = express.Router();
 const protect  = require("../middleware/authMiddleware");
@@ -34,7 +35,7 @@ router.post("/", protect, validateBody(createBookmarkSchema), async (req, res) =
 
         res.status(201).json(bookmark);
     } catch (error) {
-        console.log("BOOKMARK CREATE ERROR:", error.message);
+        logger.error("BOOKMARK CREATE ERROR:", error.message);
         res.status(500).json({ message: "Failed to save bookmark" });
     }
 });
