@@ -1,0 +1,65 @@
+# CI = "continuous integration": GitHub runs these checks automatically on every push and every pull request,
+# and shows a green tick (all good) or a red cross (something broke) next to the commit.
+
+# The name shown in the GitHub "Actions" tab.
+name: CI
+
+# When to run: on every push to main, and on every pull request (so broken changes are caught BEFORE they are merged).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A workflow is made of "jobs"; these two run at the same time on separate fresh Linux machines.
+jobs:
+  backend:
+    # Which kind of machine to rent for free.
+    runs-on: ubuntu-latest
+    # A "service container" = a real MongoDB database started next to the tests, so the PDF-storage (GridFS) tests run against the real thing.
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        # Wait until MongoDB answers a ping before the tests start.
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    # Run every "run:" command inside the backend folder.
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      # 1) Download your repository's code onto the machine.
+      - uses: actions/checkout@v4
+      # 2) Install Node.js 22 and cache downloaded packages so later runs are faster.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      # 3) Install exactly the versions in package-lock.json ("ci" = clean, repeatable install).
+      - run: npm ci
+      # 4) Run all tests. TEST_MONGO_URI switches on the real-database tests.
+      - run: npm test
+        env:
+          TEST_MONGO_URI: mongodb://localhost:27017/wordknit_test
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      # Same first two steps as above, for the frontend folder.
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      # The frontend has no tests yet, but a successful production build proves the code compiles and every import resolves.
+      - run: npm run build
