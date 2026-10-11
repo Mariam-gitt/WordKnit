@@ -47,12 +47,25 @@ const upload = (userId, buffer = makePdf(), name = "book.pdf") =>
     request(app).post("/api/documents").set(loginAs(userId)).field("pageCount", "12").attach("pdf", buffer, name);
 
 maybe("PDF storage in GridFS (real database)", () => {
-    // Connect once before all tests, and start from an empty database.
-    beforeAll(async () => { await mongoose.connect(TEST_URI); await mongoose.connection.dropDatabase(); });
+    // clearAll() empties every collection (including the GridFS ones, pdfs.files and pdfs.chunks) but KEEPS the collections and their indexes.
+    // We used to drop the whole database, but on a real MongoDB a drop can collide with indexes that Mongoose is still building in the background,
+    // which causes random "flaky" failures. Emptying is slower by milliseconds and never races.
+    const clearAll = async () => {
+        // Every collection that currently exists in the test database.
+        const collections = await mongoose.connection.db.collections();
+        // Delete all documents from each, in parallel.
+        await Promise.all(collections.map((collection) => collection.deleteMany({})));
+    };
+    // Connect once, wait until Mongoose has finished building every model's indexes (init), then start from empty.
+    beforeAll(async () => {
+        await mongoose.connect(TEST_URI);
+        await Promise.all(Object.values(mongoose.models).map((model) => model.init()));
+        await clearAll();
+    });
     // Empty everything between tests so they can't affect each other.
-    beforeEach(async () => { await mongoose.connection.dropDatabase(); });
-    // Disconnect at the end so Jest can exit cleanly.
-    afterAll(async () => { await mongoose.connection.dropDatabase(); await mongoose.disconnect(); });
+    beforeEach(clearAll);
+    // Empty once more and disconnect at the end so Jest can exit cleanly.
+    afterAll(async () => { await clearAll(); await mongoose.disconnect(); });
 
     // Two different users, to test that one can't touch the other's PDFs.
     const alice = new mongoose.Types.ObjectId();
