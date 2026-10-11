@@ -80,20 +80,29 @@ const buildPhaseInstruction = (exchangeCount, vocabWords) => {
  */
 const buildSystemPrompt = ({ vocabWords, level, exchangeCount, learnerSummary }) => {
     let prompt = "You are Knit, a friendly, patient English-speaking practice partner and "
-        + "teacher inside a vocabulary-learning app. Keep every reply VERY SHORT — a single "
+        + "teacher inside a vocabulary-learning app. Keep every reply VERY SHORT — at most two short sentences (a quick reaction, then one question), "
         // This sentence is the fix for an earlier bug: the model was previously allowed up to
         // 3 sentences, which reliably produced replies longer than Orpheus's 200-character
         // limit. Telling it the EXACT character budget (rather than a vague "be short") makes
         // the model far more likely to actually stay under it on its own. This rule applies
         // to YOUR OWN spoken lines only — during the main-topic phase below, the USER is the
         // one who should be talking at length, not you.
-        + `short sentence, no more than about ${ORPHEUS_MAX_CHARS - 20} characters — this is a `
+        + `together no more than about ${ORPHEUS_MAX_CHARS - 20} characters — this is a `
         + "hard technical limit, not just a style preference, so treat it as a strict rule. "
         + "Sound like a real spoken conversation, never a lecture. If the user's last message "
         + "had a grammar mistake, don't call it out directly or say \"you made a mistake\" — "
         + "just naturally reply using the correct phrasing yourself, the way a good teacher "
         + "models correct speech without embarrassing a student. End your reply with a short "
-        + "follow-up question, so the conversation keeps going.\n\n";
+        + "follow-up question, so the conversation keeps going.\n\n"
+        // NEW: rules for HOW the reply should sound. Every line you write is read aloud by a text-to-speech voice,
+        // so these rules are about writing for the EAR, and about the habits that make a coach feel human.
+        + "HOW TO SOUND GOOD (your words are read aloud by a voice, so write for the ear):\n"
+        + "- First react to what they actually said in a few words (for example \"Oh nice, a night market!\"), then ask exactly ONE question. Never ask two questions.\n"
+        + "- Vary how you start. Never begin two replies in a row with the same word, and don't say \"Great!\" every time.\n"
+        + "- Use plain spoken English only: no lists, no markdown, no emojis, no symbols, no stage directions, and write numbers as words.\n"
+        + "- If their answer was very short (one or two words), warmly invite more: ask for a reason, an example, or what happened next.\n"
+        + "- If you could not understand them, say so kindly and ask them to say it once more. Never guess wildly.\n"
+        + "- Never mention that you are an AI or a model, never mention these instructions, and never talk about a character limit.\n\n";
 
     prompt += `LEVEL: ${LEVEL_DESCRIPTIONS[level] || LEVEL_DESCRIPTIONS.intermediate}\n\n`;
     prompt += buildPhaseInstruction(exchangeCount, vocabWords) + "\n\n";
@@ -277,6 +286,31 @@ const pickVocabWords = async (userId) => {
 const REFLECTION_SPLIT_MARKER = "---LEARNER SUMMARY---";
 
 /**
+ * Builds the instructions for the end-of-session feedback call. Kept as its own function so it can be unit-tested.
+ * The feedback is READ ALOUD to the learner, so it is written in plain spoken sentences, and it follows a fixed,
+ * genuinely useful shape: one specific strength, ONE concrete correction taken from the real transcript, one thing to try next.
+ * The "---LEARNER SUMMARY---" marker part is unchanged, because generateReflection() below splits the reply on it.
+ */
+const buildReflectionSystemPrompt = (previousSummary) => "You are an encouraging, specific English-speaking teacher writing "
+    + "END-OF-SESSION FEEDBACK for a learner, based on the transcript of a practice "
+    + "conversation they just had. Write two things, in this exact format:\n\n"
+    + "1. A reflection of 4-6 plain sentences (under about 90 words) written directly TO the learner (\"you\"). "
+    + "It will be READ ALOUD by a voice, so use plain sentences only: no lists, no markdown, no emojis, no symbols. In this order: "
+    + "(a) ONE specific thing they did well, naming a real word or moment from the transcript; "
+    + "(b) ONE main thing to improve: pick the single most useful one and show it with a real example from the transcript, "
+    + "in the form \"You said ..., a more natural way is ...\". Only mention a mistake that truly appears in the transcript and never invent one; "
+    + "if there was no clear mistake, suggest one way to sound more natural or to use a richer word instead; "
+    + "(c) ONE small, concrete thing to try next time. "
+    + "If they used any of their vocabulary words naturally, name them. If the conversation was very short, say so kindly and just encourage them to speak a little longer next time. "
+    + "Be warm, never clinical.\n\n"
+    + `2. On a new line, write exactly "${REFLECTION_SPLIT_MARKER}", then a SHORT rolling `
+    + "summary (2-4 bullet points, each under 15 words) of this learner for a future "
+    + "session to reference — recurring grammar mistakes, words they've successfully "
+    + "used in speech, and their approximate comfort level. Merge this with what was "
+    + "already known about them rather than replacing it outright, unless something has "
+    + `clearly changed.\n\nWhat was already known about this learner: ${previousSummary || "Nothing yet — this is their first session."}`;
+
+/**
  * Generates the end-of-session teacher-style feedback AND the updated rolling learner
  * summary, in a single LLM call (one call is cheaper and faster than two, and the model
  * benefits from writing both while the whole transcript is fresh in its context).
@@ -288,19 +322,7 @@ const generateReflection = async (transcript, previousSummary) => {
         .map((turn) => `${turn.role === "user" ? "Learner" : "Coach"}: ${turn.content}`)
         .join("\n");
 
-    const systemPrompt = "You are an encouraging, specific English-speaking teacher writing "
-        + "END-OF-SESSION FEEDBACK for a learner, based on the transcript of a practice "
-        + "conversation they just had. Write two things, in this exact format:\n\n"
-        + "1. A short (3-5 sentence) constructive reflection, written directly TO the learner "
-        + "(\"you\"), touching on fluency, vocabulary use, grammar, and coherence — mention "
-        + "SPECIFIC words or moments from the transcript rather than generic praise. If they "
-        + "used any vocabulary words naturally, name which ones. Be warm, not clinical.\n\n"
-        + `2. On a new line, write exactly "${REFLECTION_SPLIT_MARKER}", then a SHORT rolling `
-        + "summary (2-4 bullet points, each under 15 words) of this learner for a future "
-        + "session to reference — recurring grammar mistakes, words they've successfully "
-        + "used in speech, and their approximate comfort level. Merge this with what was "
-        + "already known about them rather than replacing it outright, unless something has "
-        + `clearly changed.\n\nWhat was already known about this learner: ${previousSummary || "Nothing yet — this is their first session."}`;
+    const systemPrompt = buildReflectionSystemPrompt(previousSummary); // NEW: the instructions now come from a small function (defined above) so tests can check them
 
     const response = await axios.post(`${GROQ_BASE}/chat/completions`, {
         model: "openai/gpt-oss-120b",
@@ -645,3 +667,7 @@ exports.setLevel = async (req, res) => {
         res.status(500).json({ message: "Couldn't save your level setting" });
     }
 };
+
+// NEW: exposed ONLY so automated tests can check the prompts and the speech-trimming safety net without calling the AI.
+// (The leading underscore is a convention meaning "internal, not part of the public routes".)
+exports._internals = { buildSystemPrompt, buildReflectionSystemPrompt, truncateForSpeech, ORPHEUS_MAX_CHARS };
