@@ -42,24 +42,53 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: backend/package-lock.json
-      # 3) Install the packages and run all tests. "tee" shows the output normally AND saves a copy to a file;
+      # 3) Install the exact package versions from package-lock.json. "tee" shows the output AND saves a copy to a file;
       #    "pipefail" makes the step fail if either command fails (otherwise tee would hide the failure).
-      - name: Install packages and run tests
+      - name: Install packages
         shell: bash
         run: |
           set -o pipefail
           npm ci 2>&1 | tee ../backend-log.txt
-          npm test 2>&1 | tee -a ../backend-log.txt
+      # 4) Before running any test, check that the test database can really be reached, and say clearly if not.
+      - name: Check the test database is reachable
+        shell: bash
         env:
           # 127.0.0.1 instead of "localhost": some GitHub machines resolve "localhost" to an address the database container doesn't listen on.
           TEST_MONGO_URI: mongodb://127.0.0.1:27017/wordknit_test
-      # 4) ALWAYS (even when the tests failed) copy the end of the log onto the run's front page ("Summary"),
+        run: |
+          set -o pipefail
+          { echo "--- docker containers ---"; docker ps -a --format '{{.Image}} | {{.Status}} | {{.Ports}}'; } 2>&1 | tee ../mongo-check.txt
+          node - <<'EOF' 2>&1 | tee -a ../mongo-check.txt
+          const { MongoClient } = require("mongodb");
+          new MongoClient(process.env.TEST_MONGO_URI, { serverSelectionTimeoutMS: 10000 }).connect()
+            .then(async (client) => { const r = await client.db().command({ ping: 1 }); console.log("MongoDB reachable, ping ok =", r.ok); await client.close(); })
+            .catch((e) => { console.error("MongoDB NOT reachable:", e.message); process.exit(1); });
+          EOF
+      # 5) If the check failed, also print the database container's own log (why did it not accept connections?).
+      - name: Database container log (only when the check failed)
+        if: failure()
+        shell: bash
+        run: |
+          docker logs "$(docker ps -aq --filter ancestor=mongo:7 | head -1)" 2>&1 | tail -40 | tee -a ../mongo-check.txt || true
+      # 6) Run all tests.
+      - name: Run tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee -a ../backend-log.txt
+        env:
+          TEST_MONGO_URI: mongodb://127.0.0.1:27017/wordknit_test
+      # 7) ALWAYS (even when something failed) copy the logs onto the run's front page ("Summary"),
       #    so you can read what went wrong without opening any step.
-      - name: Show the log on the run summary page
+      - name: Show the logs on the run summary page
         if: always()
         shell: bash
         run: |
           {
+            echo '### Database check'
+            echo '```'
+            cat ../mongo-check.txt 2>/dev/null || echo "(not reached)"
+            echo '```'
             echo '### Backend log (last 80 lines)'
             echo '```'
             tail -n 80 ../backend-log.txt || true
