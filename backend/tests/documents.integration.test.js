@@ -58,14 +58,19 @@ maybe("PDF storage in GridFS (real database)", () => {
     };
     // Connect once, wait until Mongoose has finished building every model's indexes (init), then start from empty.
     beforeAll(async () => {
-        await mongoose.connect(TEST_URI);
+        // serverSelectionTimeoutMS: give up after 15 seconds with a CLEAR error ("could not connect to 127.0.0.1:27017 ...") instead of hanging silently.
+        await mongoose.connect(TEST_URI, { serverSelectionTimeoutMS: 15000 });
         await Promise.all(Object.values(mongoose.models).map((model) => model.init()));
         await clearAll();
     });
     // Empty everything between tests so they can't affect each other.
     beforeEach(clearAll);
     // Empty once more and disconnect at the end so Jest can exit cleanly.
-    afterAll(async () => { await clearAll(); await mongoose.disconnect(); });
+    // (Only clear when the connection really opened: if the connection FAILED, a second confusing error here would hide the real one.)
+    afterAll(async () => {
+        if (mongoose.connection.readyState === 1) await clearAll(); // readyState 1 = connected
+        await mongoose.disconnect();
+    });
 
     // Two different users, to test that one can't touch the other's PDFs.
     const alice = new mongoose.Types.ObjectId();
