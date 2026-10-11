@@ -15,6 +15,8 @@ jobs:
   backend:
     # Which kind of machine to rent for free.
     runs-on: ubuntu-latest
+    # Safety: if something hangs, stop after 10 minutes instead of waiting for hours.
+    timeout-minutes: 10
     # A "service container" = a real MongoDB database started next to the tests, so the PDF-storage (GridFS) tests run against the real thing.
     services:
       mongo:
@@ -40,15 +42,33 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: backend/package-lock.json
-      # 3) Install exactly the versions in package-lock.json ("ci" = clean, repeatable install).
-      - run: npm ci
-      # 4) Run all tests. TEST_MONGO_URI switches on the real-database tests.
-      - run: npm test
+      # 3) Install the packages and run all tests. "tee" shows the output normally AND saves a copy to a file;
+      #    "pipefail" makes the step fail if either command fails (otherwise tee would hide the failure).
+      - name: Install packages and run tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tee ../backend-log.txt
+          npm test 2>&1 | tee -a ../backend-log.txt
         env:
-          TEST_MONGO_URI: mongodb://localhost:27017/wordknit_test
+          # 127.0.0.1 instead of "localhost": some GitHub machines resolve "localhost" to an address the database container doesn't listen on.
+          TEST_MONGO_URI: mongodb://127.0.0.1:27017/wordknit_test
+      # 4) ALWAYS (even when the tests failed) copy the end of the log onto the run's front page ("Summary"),
+      #    so you can read what went wrong without opening any step.
+      - name: Show the log on the run summary page
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### Backend log (last 80 lines)'
+            echo '```'
+            tail -n 80 ../backend-log.txt || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: frontend
@@ -60,6 +80,21 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
       # The frontend has no tests yet, but a successful production build proves the code compiles and every import resolves.
-      - run: npm run build
+      - name: Install packages and build
+        shell: bash
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tee ../frontend-log.txt
+          npm run build 2>&1 | tee -a ../frontend-log.txt
+      # Same trick: always show the end of the log on the run's front page.
+      - name: Show the log on the run summary page
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### Frontend log (last 60 lines)'
+            echo '```'
+            tail -n 60 ../frontend-log.txt || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
