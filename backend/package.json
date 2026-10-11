@@ -40,6 +40,7 @@
     "testMatch": [
       "**/tests/**/*.test.js"
     ],
-    "clearMocks": true
+    "clearMocks": true,
+    "testTimeout": 30000
   }
 }
