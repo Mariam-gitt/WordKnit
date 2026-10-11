@@ -81,6 +81,9 @@ function SpeakingPractice() {
     const streamRef = useRef(null);        // the raw microphone stream, so we can properly release it (turn off the browser's "mic in use" indicator) when done
 
     const historyRef = useRef([]);
+    const currentAudioRef = useRef(null);       // NEW: the coach's reply clip that is playing RIGHT NOW (null when silent) — we keep it so we can stop it
+    const currentUtteranceRef = useRef(null);   // NEW: the browser-voice sentence being spoken RIGHT NOW (feedback, "define X"...), so only the latest one can switch the "speaking" flag off
+    const [isSpeaking, setIsSpeaking] = useState(false); // NEW: true while ANY voice (coach clip or browser voice) is talking — decides whether the "Stop voice" button shows
     const lastAudioRef = useRef(null);          // the last base64 reply clip the coach spoke — lets "repeat" replay it without a new backend call
     const lastDefinedWordRef = useRef(null);    // the word most recently looked up via "define X" — what "add it"/"spell"/"synonyms" act on
     const lastDefinedMeaningRef = useRef(null); // that word's full meaning object, so "add it" can save it without looking it up again
@@ -115,8 +118,27 @@ function SpeakingPractice() {
         // audio/wav — reverted back from mp3 (see synthesizeSpeech in speakingController.js:
         // Orpheus only actually accepts "wav" as a response_format, despite mp3/flac/ogg
         // appearing as options in some generic Groq TTS wrapper docs).
+        stopAllSpeech(); // NEW: silence whatever is still talking first, so two voices never overlap
         const audio = new Audio(`data:audio/wav;base64,${base64Wav}`);
-        audio.play().catch(() => {});
+        currentAudioRef.current = audio; // NEW: remember it (before, this clip was thrown away and could never be stopped)
+        setIsSpeaking(true); // NEW: show the "Stop voice" button
+        const finished = () => { // NEW: runs when the clip ends or fails
+            if (currentAudioRef.current === audio) { currentAudioRef.current = null; setIsSpeaking(false); } // only if it is still the current clip
+        };
+        audio.onended = finished; // NEW: clip finished by itself
+        audio.onerror = finished; // NEW: clip could not play
+        audio.play().catch(finished); // NEW: the browser blocked autoplay → also reset the flag
+    };
+
+    // NEW: ONE function that silences every kind of voice. Called by the Stop button, Dismiss, the mic, ending/starting a session, and when you leave the page.
+    const stopAllSpeech = () => {
+        if (currentAudioRef.current) { // is a coach clip playing?
+            currentAudioRef.current.pause(); // stop it
+            currentAudioRef.current = null; // forget it
+        }
+        if ("speechSynthesis" in window) window.speechSynthesis.cancel(); // stop the browser's own voice too (this is what reads the feedback aloud)
+        currentUtteranceRef.current = null; // nothing is being spoken any more
+        setIsSpeaking(false); // hide the "Stop voice" button
     };
 
     // Speaks text using the BROWSER's own voice (free, instant, no backend round trip) —
@@ -131,7 +153,14 @@ function SpeakingPractice() {
             if (chosen) utterance.voice = chosen;
         }
         if (!("speechSynthesis" in window)) return; // no text-to-speech in this browser: nothing to play
-        window.speechSynthesis.cancel(); // don't let two local replies overlap
+        stopAllSpeech(); // NEW: also silences a playing coach clip (cancel() below only knew about the browser voice)
+        currentUtteranceRef.current = utterance; // NEW: this is now the sentence that counts as "being spoken"
+        const finished = () => { // NEW: runs when this sentence ends or is cut off
+            if (currentUtteranceRef.current === utterance) { currentUtteranceRef.current = null; setIsSpeaking(false); } // ignore old sentences that were replaced
+        };
+        utterance.onend = finished; // NEW: spoken to the end
+        utterance.onerror = finished; // NEW: interrupted or failed
+        setIsSpeaking(true); // NEW: show the "Stop voice" button
         window.speechSynthesis.speak(utterance);
     };
 
@@ -205,6 +234,7 @@ function SpeakingPractice() {
     };
 
     const startConversation = async () => {
+        stopAllSpeech(); // NEW: a new conversation should never start on top of the old voice
         setErrorMsg("");
         setReflection(null); // clear out any leftover feedback card from a previous session
         setIsProcessing(true);
@@ -229,6 +259,7 @@ function SpeakingPractice() {
     };
 
     const startRecording = async () => {
+        stopAllSpeech(); // NEW: when you start talking, the coach goes quiet (and its voice can't leak into your microphone)
         setErrorMsg("");
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -314,6 +345,7 @@ function SpeakingPractice() {
     // screen, speaks it locally, and resets back to the "Start Conversation" state. ──
     const endCurrentSession = async () => {
         if (!sessionIdRef.current) return;
+        stopAllSpeech(); // NEW: stop the coach mid-sentence when you press "End session"
         setErrorMsg("");
         setIsEndingSession(true);
         try {
@@ -392,6 +424,9 @@ function SpeakingPractice() {
             if (streamRef.current) {
                 streamRef.current.getTracks().forEach((track) => track.stop());
             }
+            // NEW: leaving this page (or closing the tab) must silence the voice, otherwise it keeps talking over the next page.
+            if (currentAudioRef.current) currentAudioRef.current.pause(); // stop the coach clip
+            if ("speechSynthesis" in window) window.speechSynthesis.cancel(); // stop the browser voice
         };
     }, []);
 
@@ -585,6 +620,7 @@ function SpeakingPractice() {
                             <Button variant="ghost" onClick={endCurrentSession} disabled={isProcessing || isRecording || isEndingSession}>
                                 {isEndingSession ? "Wrapping up…" : "End session"}
                             </Button>
+                            {isSpeaking && <Button variant="ghost" icon={<TbPlayerStop size={16} />} onClick={stopAllSpeech}>Stop voice</Button>}{/* NEW: appears only while a voice is talking */}
                         </div>
                     </>
                 )}
@@ -595,7 +631,8 @@ function SpeakingPractice() {
                         <div className="define-head">
                             <strong>Session feedback</strong>
                             <span className="grow" />
-                            <Button size="sm" variant="ghost" onClick={() => setReflection(null)}>Dismiss</Button>
+                            {isSpeaking && <Button size="sm" variant="ghost" onClick={stopAllSpeech}>Stop voice</Button>}{/* NEW: silence the spoken feedback but keep reading it */}
+                            <Button size="sm" variant="ghost" onClick={() => { stopAllSpeech(); setReflection(null); }}>Dismiss</Button>{/* NEW: Dismiss now also stops the voice (before, it only hid the card and the voice kept talking) */}
                         </div>
                         <p>{reflection}</p>
                     </div>
