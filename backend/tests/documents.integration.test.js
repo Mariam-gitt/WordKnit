@@ -3,6 +3,13 @@
 // Without it the whole file is skipped, so `npm test` still works on a laptop with no database.
 //   Example:  TEST_MONGO_URI=mongodb://127.0.0.1:27017/wordknit_test npm test
 
+// IMPORTANT (why `npm test` starts Jest with --experimental-vm-modules, see package.json):
+// Jest runs test code inside a sandbox that does not allow dynamic import(). The MongoDB driver uses a dynamic import while building
+// the "who am I" message it sends when it connects (the client metadata). Inside the sandbox that step fails silently and the driver sends an EMPTY message.
+// A real MongoDB rejects that with: "Missing required sub-document 'driver' in the client metadata document".
+// (Your running app is not affected: it runs in plain Node, not inside Jest. A lenient stand-in database like FerretDB doesn't notice either.)
+// The flag lets the sandbox allow dynamic import(), so the driver's message is complete again.
+
 // Read the test-database address from the environment (undefined when not provided).
 const TEST_URI = process.env.TEST_MONGO_URI;
 // describe.skip = "register these tests but don't run them"; so without a database they show up as skipped, not failed.
