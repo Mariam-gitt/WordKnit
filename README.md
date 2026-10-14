@@ -1,30 +1,87 @@
 # WordKnit
 
-WordKnit is a full-stack vocabulary learning platform designed to help you learn real words from the material you read. Upload a PDF, read it in-app, identify difficult words, save vocabulary, review them, and build a stronger learning habit.
+WordKnit is a full-stack vocabulary learning platform built for readers who want to learn real words from the material they read. Users can upload PDFs, read highlighted passages in-app, save difficult words, review them with flashcards and quizzes, and practice speaking in context.
 
-It blends a React frontend, a Node.js/Express API, MongoDB storage, and Python-based AI services to turn reading into a personalized language-learning workflow.
+The project combines a React + Vite frontend, a Node.js/Express API, MongoDB persistence, and AI-powered language-learning workflows.
 
-## Features
+## Product overview
+
+WordKnit turns reading into a learning system:
+
+- upload or analyze a PDF
+- extract difficult words from a document
+- show contextual meanings and examples
+- save vocabulary to a personal learning library
+- review through quiz and flashcard experiences
+- practice speaking and comprehension via AI-assisted flows
+
+## Architecture
+
+```mermaid
+flowchart LR
+    User[Reader / Learner] --> FE[React Frontend\nVite + React Router]
+    FE --> API[Express API\nNode.js + MongoDB]
+    API --> DB[(MongoDB)]
+    API --> PDF[PDF Analysis\nText extraction + difficulty scoring]
+    API --> AI[AI / RAG Services\nGroq + contextual learning]
+    FE --> Auth[JWT Session + Cookie Auth]
+    API --> Auth
+
+    subgraph Client
+        FE
+        Auth
+    end
+
+    subgraph Server
+        API
+        PDF
+        AI
+        DB
+    end
+```
+
+## High-level request flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant FE as Frontend
+    participant API as Backend API
+    participant DB as MongoDB
+    participant AI as AI/RAG Service
+
+    U->>FE: Login / upload PDF / review words
+    FE->>API: HTTP request with cookie auth
+    API->>DB: Read or write user data
+    alt PDF analysis or contextual learning
+        API->>AI: Send text / word / passage context
+        AI-->>API: Parsed meaning, examples, answer
+    end
+    API-->>FE: JSON response
+    FE-->>U: Render dashboard, reading view, vocab, quiz
+```
+
+## Key features
 
 - PDF reading and analysis for difficult vocabulary
-- In-document reading experience with bookmarks and saved highlights
-- Vocabulary tracking with word meaning, usage context, and review status
-- Flashcards and quiz-based revision
-- Word profile pages with dictionary-style information and contextual explanations
-- AI-powered contextual interpretation of words within a passage
-- JWT-based authentication and user account management
-- MongoDB-backed persistence for users, words, documents, and bookmarks
-- Docker-based local setup for full-stack development
+- Document-based vocabulary extraction and tracking
+- Word profile pages with context and definitions
+- Quizzes and flashcards
+- Speaking practice and AI-assisted learning flows
+- JWT-based authenticated sessions using cookies
+- MongoDB persistence for users, words, documents, bookmarks, and speaking sessions
+- Dockerized local development setup
 
-## Tech Stack
+## Tech stack
 
-- Frontend: React 19, Vite, React Router
-- Backend: Node.js, Express.js, MongoDB
-- AI/ML: Python microservices, Groq API, retrieval-based document Q&A
-- Auth: JWT + bcryptjs
-- Deployment: Vercel + Docker
+- Frontend: React 19, Vite, React Router, Axios
+- UI: Radix components, custom styles, responsive layout
+- Backend: Node.js, Express 5, MongoDB via Mongoose
+- Auth: JWT + bcryptjs + httpOnly cookies
+- AI/ML: Python services, Groq integration, document-context analysis
+- Deployment: Vercel, Docker Compose
 
-## Project Structure
+## Repository structure
 
 ```text
 WordKnit/
@@ -34,62 +91,58 @@ WordKnit/
 │   ├── middleware/
 │   ├── models/
 │   ├── routes/
+│   ├── services/
+│   ├── tests/
 │   ├── utils/
+│   ├── validators/
 │   ├── server.js
 │   ├── package.json
-│   ├── package-lock.json
 │   ├── requirements.txt
 │   ├── pdf_service.py
+│   ├── ocr_service.py
 │   ├── Dockerfile
 │   └── vercel.json
 ├── frontend/
 │   ├── public/
 │   ├── src/
 │   ├── package.json
-│   ├── package-lock.json
 │   ├── vite.config.js
-│   ├── index.html
 │   ├── Dockerfile
 │   ├── nginx.conf
 │   └── README.md
+├── docs/
+│   ├── ARCHITECTURE.md
+│   └── DEVELOPMENT.md
 ├── docker-compose.yml
 ├── DOCKER.md
 ├── README.md
-├── project-structure.md
-└── .gitignore
+├── .gitignore
+└── .github/
 ```
 
-## How It Works
+## Documentation
 
-### 1. Read and analyze a document
-Users upload PDFs and open them inside the app. The backend extracts text, scores vocabulary difficulty, and identifies words that are likely challenging based on context and word characteristics.
+- [Architecture guide](./docs/ARCHITECTURE.md)
+- [Development guide](./docs/DEVELOPMENT.md)
+- [Docker guide](./DOCKER.md)
 
-### 2. Save and review vocabulary
-Words can be added to the learner's personal vocabulary list. The app tracks meanings, examples, statuses, and review history.
-
-### 3. Learn with interactive tools
-The app supports flashcards, quizzes, and word profiles to reinforce understanding and retention.
-
-### 4. Keep user context secure
-Authentication is handled with JWTs, and user data is kept separate by account.
-
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
 - Node.js 18+
 - Python 3.10+
-- MongoDB Atlas or a local MongoDB instance
-- Groq API key (for AI features)
+- MongoDB Atlas or local MongoDB
+- Groq API key for AI features
 
-### 1) Clone the repository
+### 1) Clone and install
 
 ```bash
 git clone https://github.com/Mariam-gitt/WordKnit.git
 cd WordKnit
 ```
 
-### 2) Backend setup
+Backend:
 
 ```bash
 cd backend
@@ -97,87 +150,53 @@ npm install
 pip install -r requirements.txt
 ```
 
-Create a `.env` file:
+Frontend:
+
+```bash
+cd ../frontend
+npm install
+```
+
+### 2) Configure environment variables
+
+Create a `.env` file in `backend/`:
 
 ```env
 MONGO_URI=your_mongodb_connection_string
 JWT_SECRET=your_secret_key
 GROQ_API_KEY=your_groq_api_key
 PORT=5000
-
-# which website(s) may call this API (CORS). Comma-separated, no trailing slash needed.
-# REQUIRED on the live server (e.g. https://your-frontend.vercel.app); defaults to http://localhost:5173 for local dev.
 FRONTEND_URL=http://localhost:5173
-
-# login cookie settings (the login token lives in an httpOnly cookie).
-# Defaults are right for most setups: production = SameSite=None + Secure (frontend and backend on different domains), development = SameSite=Lax.
-# If frontend and backend share ONE address (e.g. Docker + nginx), use COOKIE_SAMESITE=lax and, for plain http://localhost, COOKIE_SECURE=false.
-# COOKIE_SAMESITE=lax
-# COOKIE_SECURE=false
-
-# max PDF upload size in MB. Default 4, because Vercel rejects request bodies over 4.5 MB. When self-hosting you can raise it.
-# MAX_PDF_MB=11
-
-# how chatty the server log is: debug | info | warn | error | silent (default: info)
-# LOG_LEVEL=info
-
-# optional integrations
-HUBSPOT_PRIVATE_APP_TOKEN=your_hubspot_token
-RESEND_API_KEY=your_resend_key
 ```
 
-Run the backend:
-
-```bash
-npm run dev
-```
-
-Optional Python services:
-
-```bash
-python pdf_service.py
-```
-
-### Running the tests
-
-```bash
-cd backend
-npm test
-```
-
-Most tests need no database. The PDF-storage tests need a throw-away MongoDB; they are skipped unless you set `TEST_MONGO_URI`.
-
-### 3) Frontend setup
-
-By default the frontend talks to the deployed Vercel backend. To use your LOCAL backend, create `frontend/.env` with:
+Create a `.env` file in `frontend/` if needed for local development:
 
 ```env
 VITE_API_URL=http://localhost:5000/api
 ```
 
-```bash
-cd frontend
-npm install
-```
+### 3) Run locally
 
-Create a `.env` file:
-
-```env
-REACT_APP_API_URL=http://localhost:5000
-```
-
-Start the frontend:
+Backend:
 
 ```bash
+cd backend
 npm run dev
 ```
 
-The app will run in development mode, usually at:
+Frontend:
+
+```bash
+cd frontend
+npm run dev
+```
+
+Then open:
 
 - Frontend: http://localhost:5173
 - Backend: http://localhost:5000
 
-### 4) Docker setup
+### 4) Run with Docker
 
 From the project root:
 
@@ -185,65 +204,47 @@ From the project root:
 docker-compose up --build
 ```
 
-This starts the main services together for a local all-in-one setup.
+## API areas
 
-## Main API Endpoints
+The backend exposes major route groups for:
 
-The backend exposes endpoints for authentication, documents, vocabulary, quizzes, and AI-assisted learning.
+- `POST /api/auth/*` — registration, login, account flows
+- `GET /api/words`, `POST /api/words` — vocabulary management
+- `POST /api/pdf/*` — document and PDF processing
+- `GET /api/documents`, `POST /api/documents` — file and document records
+- `GET /api/bookmarks`, `POST /api/bookmarks` — saved reading locations
+- `GET /api/profile/*` — word profile and contextual lookup
+- `POST /api/contextual/*` — AI contextual interpretation
+- `POST /api/speaking/*` — speaking-practice conversation flow
 
-### Authentication
+## Data model
 
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `DELETE /api/auth/account`
+The data layer is centered on MongoDB documents such as:
 
-### Vocabulary and learning
+- `User`
+- `Word`
+- `Document`
+- `Bookmark`
+- `SpeakingSession`
+- `WordCache`
 
-- `GET /api/words`
-- `POST /api/words`
-- `PUT /api/words/:id`
-- `DELETE /api/words/:id`
-- `GET /api/quiz`
-- `POST /api/quiz/submit`
+These models support user-specific learning history, vocabulary retention, and reading flows.
 
-### Documents and reading
+## Security and app behavior
 
-- `POST /api/documents`
-- `GET /api/documents`
-- `PATCH /api/documents/:id`
-- `POST /api/bookmarks`
-- `GET /api/bookmarks`
-- `POST /api/pdf/analyze-difficulty`
-
-## Database Model
-
-WordKnit stores core data in MongoDB, including:
-
-- Users
-- Words
-- Documents
-- Bookmarks
-
-This allows each user to maintain a personal vocabulary library tied to their reading and learning activity.
-
-## Security
-
-- Passwords are hashed before storage
-- JWT tokens are used for authentication
-- Protected routes are checked through middleware
-- External integrations are designed to fail gracefully without breaking core account flows
-
-## Docker
-
-See `DOCKER.md` for the full container setup and troubleshooting steps. The project includes Docker configuration for local containerized development.
+- passwords are hashed before storage
+- JWT-based auth is handled via secure cookies
+- protected routes are enforced by middleware
+- CORS and origin validation are configured for frontend-specific access
+- API rate limiting is applied to paid/AI-heavy endpoints
 
 ## Notes
 
-This project has evolved beyond a simple dictionary app into a more complete reading-and-learning workflow. It is built around the idea that vocabulary retention improves when words are encountered in context and reinforced through active revision.
+This project has grown beyond a basic dictionary app into a reading-and-learning workflow where vocabulary is learned in the context of documents, practice tasks, and repeated review. The system is designed to make vocabulary retention more effective by connecting reading, memory, and contextual meaning.
 
 ## License
 
-This project is distributed under the ISC license as defined in the package metadata.
+This project is distributed under the ISC license as defined in the repository package metadata.
 
 ## Author
 
