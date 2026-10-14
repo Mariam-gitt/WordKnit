@@ -2,7 +2,6 @@ import { useEffect, useState } from "react"; // React hooks: remember UI state a
 import { useNavigate, useLocation } from "react-router-dom"; // routing helpers: change page, know the current page
 import * as Tooltip from "@radix-ui/react-tooltip"; // Radix Tooltip.Provider: needed once so every IconButton tooltip works
 import { TbMenu2, TbLogout } from "react-icons/tb"; // menu icon and logout icon
-import YarnBallLogo from "./YarnBallLogo"; // the yarn-ball brand mark
 import { IconButton } from "./ui"; // our shared icon button with a tooltip
 import { NAV_LINKS } from "../navLinks"; // the list of sidebar links
 import { useAuth } from "../AuthContext"; // NEW: gives us signOut() for the logout button
@@ -13,7 +12,7 @@ const COLLAPSED_KEY = "wk-sidebar-collapsed";
 /**
  * AppLayout — the frame every logged-in page sits in.
  *   yellow frame → white rounded panel → [ sidebar | main ]
- *   main = top bar (menu button, CENTRED WordKnit logo, word count) + the page itself.
+ *   main = top bar (menu button, CENTRED WordKnit name, word count) + the page itself.
  * Props (parent → child): children = the page, reader = true makes the page fill the screen
  * without scrolling (used by the PDF reader), statusCount = number shown at the top right.
  */
@@ -49,7 +48,7 @@ function AppLayout({ children, reader = false, statusCount }) {
 
                     {mobileOpen && <button className="drawer-backdrop" aria-label="Close menu" onClick={() => setMobileOpen(false)} />}
 
-                    {/* Sidebar: navigation only (the logo lives in the centre of the top bar) */}
+                    {/* Sidebar: navigation only (the brand name lives in the centre of the top bar) */}
                     <aside className={`sidebar${mobileOpen ? " is-open" : ""}`}>
                         {NAV_LINKS.map((link) => (
                             <button
@@ -74,9 +73,8 @@ function AppLayout({ children, reader = false, statusCount }) {
                             <div className="topbar-left">
                                 <IconButton label="Menu" onClick={toggleMenu}><TbMenu2 size={20} /></IconButton>
                             </div>
-                            {/* The WordKnit logo, centred on every page */}
+                            {/* The WordKnit name, centred on every page (logo removed) */}
                             <button type="button" className="brand" onClick={() => goTo("/dashboard")} aria-label="WordKnit home">
-                                <YarnBallLogo size={28} />
                                 <span className="brand-name">WordKnit.</span>
                             </button>
                             <div className="topbar-right">
