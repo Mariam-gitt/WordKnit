@@ -308,27 +308,7 @@ function WordProfile() {
                         {/* SOURCES */}
                         {activeTab === "sources" && (
                             <div>
-                                <div className="sources-info-box">
-                                    <p className="section-title" style={{ marginBottom: "14px" }}>📡 How this profile was built</p>
-                                    {sourcesUsed.length > 0 ? sourcesUsed.map(s => (
-                                        <div key={s.name} className="source-pipeline-row">
-                                            <span className="source-pipeline-icon">{s.icon}</span>
-                                            <div>
-                                                <div style={{ fontWeight: 600, fontSize: "0.87rem" }}>{s.name}</div>
-                                                <div style={{ fontSize: "0.79rem", color: "var(--text-2)", marginTop: "2px" }}>{s.role}</div>
-                                            </div>
-                                        </div>
-                                    )) : <p style={{ fontSize: "0.85rem", color: "var(--text-2)" }}>Source data unavailable.</p>}
-                                </div>
-
-                                <div style={{ marginTop: "6px", marginBottom: "10px" }}>
-                                    <p className="section-title" style={{ marginBottom: "4px" }}>💡 Source pipeline explained</p>
-                                    <div style={{ fontSize: "0.82rem", color: "var(--text-2)", lineHeight: "1.7", padding: "12px 16px", background: "var(--surface)", border: "1px solid var(--border)" }}>
-                                        <strong>Step 1 — Free Dictionary API:</strong> First call for phonetics, audio, base definitions, and example sentences.<br/>
-                                        <strong>Step 2 — Wikipedia API:</strong> If the word looks academic (long, complex suffix, or field-specific), Wikipedia is queried for a contextual summary.<br/>
-                                        <strong>Step 3 — Groq AI:</strong> AI generates synonym nuances, a mnemonic memory hook, and richer usage examples in parallel.
-                                    </div>
-                                </div>
+                                {/* Simplified Sources tab — removed internal pipeline / model details per request */}
 
                                 {profile.academicSources?.length > 0 && (
                                     <div style={{ marginTop: "16px" }}>
