@@ -1,6 +1,3 @@
-
-# version: "3.9"
-
 services:
 
   # ── MongoDB ─────────────────────────────────────────────────────────
@@ -50,21 +47,6 @@ services:
       - "5001:5001"
     networks:
       - wk_net
-
-  # ── OCR service (port 5003) ──────────────────────────────────────────
-  # Currently deployed separately on Hugging Face Spaces instead of here — see
-  # OCR_SERVICE_URL in backend/routes/ocrRoutes.js. Uncomment this block if you
-  # ever want to run OCR locally alongside the rest of the stack for testing.
-  # ocr_service:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile.ocr
-  #   container_name: wk_ocr
-  #   restart: unless-stopped
-  #   ports:
-  #     - "5003:5003"
-  #   networks:
-  #     - wk_net
 
   # ── React frontend (served by Nginx) ────────────────────────────────
   frontend:

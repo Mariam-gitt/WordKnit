@@ -1,10 +1,2 @@
 # pdf_service.py
 PyMuPDF==1.24.3
-
-# ocr_service.py
-pytesseract==0.3.10
-opencv-python-headless==4.9.0.80
-numpy==1.26.4
-
-# rag_llm_service.py
-scikit-learn==1.4.2
