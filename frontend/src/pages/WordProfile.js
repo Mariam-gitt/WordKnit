@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api";
@@ -108,7 +107,7 @@ function WordProfile() {
                             Building profile for <strong>"{word}"</strong>…
                         </p>
                         <p style={{ fontSize: "0.76rem", color: "var(--text-3)", marginTop: "5px" }}>
-                            Dictionary · Wikipedia · AI analysis
+                            Loading references…
                         </p>
                     </div>
                 </div>
@@ -134,14 +133,10 @@ function WordProfile() {
         { id: "sources",  label: "🔗 Sources" },
     ];
 
-    // Determine sources used
+    // Remove model/source labels from the word profile badges.
     const sourcesUsed = [];
-    if (profile.definitions?.length > 0)
-        sourcesUsed.push({ name: "Free Dictionary API", role: "Definitions, phonetics, audio, base synonyms", icon: "📖" });
     if (profile.academicSources?.some(s => s.type === "wikipedia"))
         sourcesUsed.push({ name: "Wikipedia", role: "Academic or contextual summary for notable words", icon: "🌐" });
-    if (profile.synonymNuances?.length > 0 || profile.memoryHook)
-        sourcesUsed.push({ name: "Groq AI — LLaMA 3.3 70B", role: "Synonym nuances, memory hook, rich usage examples", icon: "🤖" });
     if (profile.definitions?.some(d => d.source === "Custom Dictionary") || profile.definitions?.length === 0)
         sourcesUsed.push({ name: "RAG / Paul Nation Dictionary", role: "Academic word meanings from curated embedded dictionary", icon: "📚" });
 
@@ -308,8 +303,6 @@ function WordProfile() {
                         {/* SOURCES */}
                         {activeTab === "sources" && (
                             <div>
-                                {/* Simplified Sources tab — removed internal pipeline / model details per request */}
-
                                 {profile.academicSources?.length > 0 && (
                                     <div style={{ marginTop: "16px" }}>
                                         <p className="section-title" style={{ marginBottom: "10px" }}>🌐 Reference content</p>
