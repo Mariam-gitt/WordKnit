@@ -1,19 +1,8 @@
 # WordKnit
 
-WordKnit is a full-stack vocabulary learning platform designed to help you learn real words from the material you read. Upload a PDF, read it in-app, identify difficult words, save vocabulary, review with flashcards and quizzes, and ask AI-powered questions about your documents.
+WordKnit is a full-stack vocabulary learning platform designed to help you learn real words from the material you read. Upload a PDF, read it in-app, identify difficult words, save vocabulary, review them, and build a stronger learning habit.
 
 It blends a React frontend, a Node.js/Express API, MongoDB storage, and Python-based AI services to turn reading into a personalized language-learning workflow.
-
-
-
-<img width="1912" height="874" alt="Screenshot (86)" src="https://github.com/user-attachments/assets/62a7fc1e-8bfd-407d-b602-1e309ec81771" />
-<img width="1890" height="874" alt="Screenshot (88)" src="https://github.com/user-attachments/assets/80564a5e-ecb0-4b19-bc4f-c9eb3fcc4892" />
-<img width="1899" height="876" alt="Screenshot (90)" src="https://github.com/user-attachments/assets/7ec40d41-66f4-4d30-bd41-78a1344c2ae4" />
-<img width="1893" height="863" alt="Screenshot (84)" src="https://github.com/user-attachments/assets/b715c1ac-0832-49e4-b72b-9bc2211b19ee" />
-<img width="1896" height="870" alt="Screenshot (87)" src="https://github.com/user-attachments/assets/723403c2-2c6f-4ad1-9eed-96bfee4631d9" />
-<img width="1915" height="865" alt="Screenshot (89)" src="https://github.com/user-attachments/assets/9d74493e-ec54-4f35-a56a-6a7586ea4f84" />
-<img width="1915" height="872" alt="Screenshot (85)" src="https://github.com/user-attachments/assets/46e392e3-7dd2-45e6-916a-e06c04ca800b" />
-
 
 ## Features
 
@@ -54,7 +43,6 @@ WordKnit/
 │   ├── pdf_service.py
 │   ├── rag_service.py
 │   ├── rag_llm_service.py
-│   ├── ocr_service.py
 │   ├── Dockerfile
 │   └── vercel.json
 ├── frontend/
@@ -164,15 +152,7 @@ cd backend
 npm test
 ```
 
-Most tests need no database. The PDF-storage tests need a throw-away MongoDB; they are skipped unless you set `TEST_MONGO_URI`
-(GitHub Actions does this automatically — see `.github/workflows/ci.yml`):
-
-```bash
-TEST_MONGO_URI=mongodb://127.0.0.1:27017/wordknit_test npm test
-```
-
-**Moving old PDFs to the new storage (optional):** PDFs saved before the GridFS change still work. To move them and shrink the database:
-`npm run migrate:pdfs` (dry run, changes nothing) then `npm run migrate:pdfs -- --apply`.
+Most tests need no database. The PDF-storage tests need a throw-away MongoDB; they are skipped unless you set `TEST_MONGO_URI`.
 
 ### 3) Frontend setup
 
@@ -181,7 +161,6 @@ By default the frontend talks to the deployed Vercel backend. To use your LOCAL 
 ```env
 VITE_API_URL=http://localhost:5000/api
 ```
-
 
 ```bash
 cd frontend
@@ -275,7 +254,7 @@ See `DOCKER.md` for the full container setup and troubleshooting steps. The proj
 
 ## Notes
 
-This project has evolved beyond a simple dictionary app into a more complete reading-and-learning workflow. It is built around the idea that vocabulary retention improves when words are encountered in context, reviewed repeatedly, and connected to authentic reading material.
+This project has evolved beyond a simple dictionary app into a more complete reading-and-learning workflow. It is built around the idea that vocabulary retention improves when words are encountered in context and reinforced through active revision.
 
 ## License
 

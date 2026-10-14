@@ -10,7 +10,6 @@ Browser
                                 ├─ MongoDB        :27017  (container)
                                 ├─ pdf_service    :5001   (container)
                                 ├─ rag_service    :5002   (container)
-                                ├─ ocr_service    :5003   (container)
                                 └─ rag_llm_service:5004   (container)
 ```
 
@@ -37,8 +36,6 @@ Open `backend/.env.docker` and set:
 docker compose up --build
 ```
 
-First build takes ~3–5 minutes (downloads base images, installs Tesseract, etc.).
-
 App is live at **http://localhost**
 
 ### 3. Useful commands
@@ -52,7 +49,6 @@ docker compose logs -f
 
 # View logs (one service)
 docker compose logs -f backend
-docker compose logs -f ocr_service
 
 # Stop everything
 docker compose down
@@ -62,7 +58,6 @@ docker compose down -v
 
 # Rebuild one service after code change
 docker compose up -d --build backend
-docker compose up -d --build ocr_service
 ```
 
 ## Service Ports (host machine)
@@ -73,17 +68,15 @@ docker compose up -d --build ocr_service
 | Backend (Node)   | 5000 |
 | pdf_service      | 5001 |
 | rag_service      | 5002 |
-| ocr_service      | 5003 |
 | rag_llm_service  | 5004 |
 
 ## Files added / changed for Docker
 
 | File | Purpose |
 |------|---------|
-| `docker-compose.yml` | Orchestrates all 7 containers |
+| `docker-compose.yml` | Orchestrates the local container stack |
 | `backend/Dockerfile` | Node backend image |
 | `backend/Dockerfile.python` | Generic Python services (pdf, rag, rag_llm) |
-| `backend/Dockerfile.ocr` | OCR service — includes Tesseract install |
 | `backend/requirements.txt` | Python dependencies |
 | `backend/.env.docker` | Environment variables for containers |
 | `frontend/Dockerfile` | React build + Nginx |
