@@ -1,5 +1,2 @@
 # pdf_service.py
 PyMuPDF==1.24.3
-
-# rag_llm_service.py
-scikit-learn==1.4.2

@@ -9,8 +9,6 @@ Browser
                └─ /api/*    → Node backend :5000
                                 ├─ MongoDB        :27017  (container)
                                 ├─ pdf_service    :5001   (container)
-                                ├─ rag_service    :5002   (container)
-                                └─ rag_llm_service:5004   (container)
 ```
 
 ## Quick Start
@@ -67,8 +65,6 @@ docker compose up -d --build backend
 | Frontend (Nginx) | 80   |
 | Backend (Node)   | 5000 |
 | pdf_service      | 5001 |
-| rag_service      | 5002 |
-| rag_llm_service  | 5004 |
 
 ## Files added / changed for Docker
 
@@ -76,7 +72,7 @@ docker compose up -d --build backend
 |------|---------|
 | `docker-compose.yml` | Orchestrates the local container stack |
 | `backend/Dockerfile` | Node backend image |
-| `backend/Dockerfile.python` | Generic Python services (pdf, rag, rag_llm) |
+| `backend/Dockerfile.python` | Generic Python services (pdf) |
 | `backend/requirements.txt` | Python dependencies |
 | `backend/.env.docker` | Environment variables for containers |
 | `frontend/Dockerfile` | React build + Nginx |

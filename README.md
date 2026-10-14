@@ -12,7 +12,6 @@ It blends a React frontend, a Node.js/Express API, MongoDB storage, and Python-b
 - Flashcards and quiz-based revision
 - Word profile pages with dictionary-style information and contextual explanations
 - AI-powered contextual interpretation of words within a passage
-- Document Q&A using retrieval + LLM workflows
 - JWT-based authentication and user account management
 - MongoDB-backed persistence for users, words, documents, and bookmarks
 - Docker-based local setup for full-stack development
@@ -41,8 +40,6 @@ WordKnit/
 │   ├── package-lock.json
 │   ├── requirements.txt
 │   ├── pdf_service.py
-│   ├── rag_service.py
-│   ├── rag_llm_service.py
 │   ├── Dockerfile
 │   └── vercel.json
 ├── frontend/
@@ -73,10 +70,7 @@ Words can be added to the learner's personal vocabulary list. The app tracks mea
 ### 3. Learn with interactive tools
 The app supports flashcards, quizzes, and word profiles to reinforce understanding and retention.
 
-### 4. Ask questions about what you read
-WordKnit can explain a word in context, along with document-level Q&A powered by retrieval and LLM services.
-
-### 5. Keep user context secure
+### 4. Keep user context secure
 Authentication is handled with JWTs, and user data is kept separate by account.
 
 ## Getting Started
@@ -141,8 +135,7 @@ npm run dev
 Optional Python services:
 
 ```bash
-python rag_service.py
-python rag_llm_service.py
+python pdf_service.py
 ```
 
 ### Running the tests
@@ -221,14 +214,6 @@ The backend exposes endpoints for authentication, documents, vocabulary, quizzes
 - `POST /api/bookmarks`
 - `GET /api/bookmarks`
 - `POST /api/pdf/analyze-difficulty`
-
-### AI-assisted features
-
-- `POST /api/contextual/explain`
-- `POST /api/ragl/upload`
-- `POST /api/ragl/ask`
-- `GET /api/profile/:word`
-- `POST /api/speaking/...` (speech-based learning workflow)
 
 ## Database Model
 
