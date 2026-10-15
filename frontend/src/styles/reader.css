@@ -2,7 +2,7 @@
    PDF READER — toolbar, side panel, page area, word panel and the wooden bookshelf library.
 ═══════════════════════════════════════════════════════════════ */
 .reader-layout { flex: 1; min-height: 0; display: flex; }
-.reader-left { flex: 1; min-width: 0; display: flex; min-height: 0; }
+.reader-left { flex: 1; min-width: 0; display: flex; min-height: 0; position: relative; } /* position: relative lets the phone side panel float over the page */
 .reader-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; background: var(--paper); }
 
 /* Toolbar */
@@ -35,15 +35,21 @@
 .reader-difficulty-chip.added { background: var(--green-soft); color: var(--green); }
 
 /* Page area */
-.reader-canvas-container { flex: 1; min-height: 0; overflow: auto; padding: 20px; display: flex; justify-content: center; align-items: flex-start; position: relative; }
+.reader-canvas-container { flex: 1; min-height: 0; overflow: auto; padding: 20px; display: flex; justify-content: flex-start; align-items: flex-start; position: relative; touch-action: pan-x pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+/* justify-content: flex-start + margin auto below = centred when the page is narrow, fully scrollable from the LEFT edge when zoomed (plain 'center' cut the left side off).
+   touch-action: pan-x pan-y = one finger scrolls, and the browser's own pinch-zoom is off so the reader's pinch-zoom can work. */
+.reader-page-wrap { margin: 0 auto; flex-shrink: 0; }
 .reader-empty { margin: auto; text-align: center; color: var(--muted); cursor: pointer; padding: 40px; }
 .pdf-text-layer { position: absolute; inset: 0; overflow: hidden; line-height: 1; }
-.pdf-text-layer span, .pdf-text-layer > * { position: absolute; color: transparent; white-space: pre; cursor: text; transform-origin: 0 0; }
+.pdf-text-layer span, .pdf-text-layer > * { position: absolute; color: transparent; white-space: pre; cursor: text; transform-origin: 0 0; -webkit-user-select: text; user-select: text; } /* user-select: text = allow long-press selection on iPhones */
 .pdf-text-layer ::selection { background: rgba(244, 197, 66, 0.55); }
 
 /* Right word panel */
 .reader-right { width: 300px; flex-shrink: 0; background: var(--white); border-left: 1px solid var(--line); padding: 18px; overflow-y: auto; }
-.panel-title { font-size: 18px; margin-bottom: 14px; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.panel-title { font-size: 18px; margin-bottom: 0; }
+.sheet-close { display: none; }                                  /* only phones need a close button (the panel is a bottom sheet there) */
+.hide-on-phone { }                                               /* marker class: hidden by the phone rules below */
 .panel-block { margin-top: 14px; }
 .panel-row { display: flex; gap: 8px; }
 .panel-row input { flex: 1; min-width: 0; }
@@ -100,8 +106,39 @@
 .book--upload:hover:not(:disabled) { background: rgba(255,255,255,0.08); transform: none; }
 
 @media (max-width: 860px) {
-  .reader-right { display: none; }                               /* phones: the word panel would leave no room for the page */
-  .reader-thumbs { width: 120px; }
+  /* Library */
   .reader-library { padding: 16px; }
   .shelf-row { padding: 20px 12px 0; flex-wrap: wrap; }
+  .shelf-controls { flex-wrap: wrap; }
+  .shelf-controls select { width: 100%; }
+  .shelf-controls input, .shelf-controls select { font-size: 16px; }   /* 16px stops iPhones zooming the page when you tap a field */
+
+  /* Toolbar: one tidy row. Filename hidden, zoom +/- hidden (pinch instead), search drops to its own row. */
+  .reader-toolbar { padding: 6px 8px; gap: 4px; min-height: 48px; }
+  .reader-toolbar .icon-btn { width: 40px; height: 40px; }            /* bigger touch targets */
+  .reader-toolbar-title { display: none; }
+  .hide-on-phone { display: none; }
+  .tool-label { min-width: 44px; font-size: 12px; }
+  .reader-search { flex-basis: 100%; order: 10; }
+  .reader-search input { flex: 1; width: auto; min-width: 0; font-size: 16px; }
+
+  /* Page area: smaller padding = bigger page */
+  .reader-canvas-container { padding: 8px 6px; }
+
+  /* Side panel (pages / marks / hard words): floats OVER the page instead of squeezing it */
+  .reader-thumbs { position: absolute; top: 0; bottom: 0; left: 0; width: min(260px, 80%); z-index: 30; box-shadow: var(--shadow-pop); }
+  .reader-thumb { padding: 12px 10px; }                               /* easier to tap */
+
+  /* Contextual meaning: a bottom sheet that slides up when you select text (it used to be hidden on phones) */
+  .reader-right {
+    position: fixed; left: 0; right: 0; bottom: 0; width: auto; z-index: 45;
+    max-height: 65vh; max-height: 65dvh; overflow-y: auto; overscroll-behavior: contain;
+    border-left: none; border-top: 1px solid var(--line-strong); border-radius: 16px 16px 0 0;
+    box-shadow: var(--shadow-pop); padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+    transform: translateY(105%); visibility: hidden;                  /* parked below the screen */
+    transition: transform 0.22s ease, visibility 0s linear 0.22s;
+  }
+  .reader-right.is-open { transform: translateY(0); visibility: visible; transition: transform 0.22s ease; }
+  .sheet-close { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: none; border-radius: var(--radius-sm); background: var(--wash); font-size: 14px; }
+  .panel-row input { font-size: 16px; }                               /* stops the iPhone zoom-on-focus */
 }
