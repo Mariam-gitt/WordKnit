@@ -4,6 +4,7 @@ import AppLayout from "../components/AppLayout";
 import * as Tooltip from "@radix-ui/react-tooltip"; // Radix Tooltip: the hover card shown on each book
 import { TbBooks, TbLayoutSidebar, TbChevronLeft, TbChevronRight, TbChevronUp, TbChevronDown, TbMinus, TbPlus, TbSearch, TbUpload, TbArrowAutofitWidth, TbTrash, TbBookmark } from "react-icons/tb"; // toolbar and shelf icons
 import { Button, IconButton, Tabs } from "../components/ui"; // shared UI kit
+import useReaderGestures, { isPhone } from "../hooks/useReaderGestures"; // NEW (mobile): pinch-to-zoom + swipe-to-turn-page, and isPhone() (true on screens 860px wide or less)
 
 const MIN_ZOOM = 50;
 const MAX_ZOOM = 250;
@@ -21,12 +22,25 @@ const BOOK_COLORS = [
 // so flipping back to a visited page is instant (no re-render to pdf.js).
 const pageCache = {};
 
+// NEW (mobile): decides how many real screen pixels to draw per CSS pixel, so text stays sharp on phones.
+// A phone screen packs 2-3 real pixels into every CSS pixel (devicePixelRatio); drawing at 1x makes the page look blurry.
+const getOutputScale = (cssWidth, cssHeight) => {
+    // Cap at 2: 3x looks only slightly better but uses much more memory.
+    let ratio = Math.min(window.devicePixelRatio || 1, 2);
+    // iPhones refuse canvases above about 16.7 million pixels, so shrink the ratio until the canvas is safely under 16 million.
+    while (cssWidth * ratio * cssHeight * ratio > 16000000 && ratio > 1) ratio -= 0.1;
+    // Never go below 1 (that would make it blurrier than before).
+    return Math.max(ratio, 1);
+};
+
 function PDFReader() {
     const canvasRef = useRef(null);
     const fileRef = useRef(null);
     const pdfRef = useRef(null);
     const textLayerRef = useRef(null);
     const canvasWrapRef = useRef(null);
+    const scrollRef = useRef(null); // NEW (mobile): the scrollable page area; used for width measuring, scroll-to-top and touch gestures
+    const lastWidthRef = useRef(0); // NEW (mobile): the page-area width we last drew at, so a height-only resize (phone address bar) is ignored
 
     const [pdfLoaded, setPdfLoaded] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
@@ -46,7 +60,8 @@ function PDFReader() {
     const [zoom, setZoom] = useState(null);
 
     // Sidebar (page thumbnails / bookmarks / difficult words)
-    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [sidebarOpen, setSidebarOpen] = useState(() => !isPhone()); // CHANGED (mobile): starts CLOSED on phones, because it is an overlay there and would cover the page
+    const [sheetOpen, setSheetOpen] = useState(false); // NEW (mobile): is the "Contextual meaning" bottom sheet showing? (only matters on phones)
     const [sidebarTab, setSidebarTab] = useState("pages"); // "pages" | "bookmarks" | "difficulty"
 
     // Search
@@ -135,6 +150,17 @@ function PDFReader() {
         if (currentDocId) loadBookmarks(currentDocId);
     }, [currentDocId, loadBookmarks]);
 
+    // NEW (mobile): the width the page may use = the scroll area's width minus its left and right padding.
+    // Before, the padding was hard-coded as 40px, which wasted space on phones where the padding is smaller.
+    const getAvailableWidth = () => {
+        const area = scrollRef.current; // the scrollable page area
+        if (!area) return 760; // fallback before the area exists (800 minus the old 40px padding)
+        const style = window.getComputedStyle(area); // the CSS values the browser actually applied
+        const padding = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0); // left + right padding in px
+        lastWidthRef.current = area.clientWidth; // remember this width so the resize handler can tell real width changes from height-only ones
+        return Math.max(area.clientWidth - padding, 200); // never smaller than 200px
+    };
+
     const renderPage = useCallback(async (pageNum, zoomOverride) => {
         if (!pdfRef.current || !canvasRef.current) return;
         setLoading(true);
@@ -144,10 +170,10 @@ function PDFReader() {
             const canvas = canvasRef.current;
             const ctx = canvas.getContext("2d");
 
-            const containerWidth = canvasWrapRef.current?.parentElement?.clientWidth || 800;
+            const availableWidth = getAvailableWidth(); // CHANGED: measured from the real padding instead of a fixed 40px
             const viewport = page.getViewport({ scale: 1 });
 
-            const baseScale = Math.max((containerWidth - 40) / viewport.width, 0.5);
+            const baseScale = Math.max(availableWidth / viewport.width, 0.5); // CHANGED: uses availableWidth
 
             const zoomPct = zoomOverride !== undefined ? zoomOverride : zoom;
             let scale;
@@ -159,14 +185,16 @@ function PDFReader() {
 
             const scaledViewport = page.getViewport({ scale });
 
-            canvas.width = scaledViewport.width;
-            canvas.height = scaledViewport.height;
-            canvas.style.width = `${scaledViewport.width}px`;
+            const outputScale = getOutputScale(scaledViewport.width, scaledViewport.height); // NEW (mobile): real pixels per CSS pixel (sharp text on phones)
+            canvas.width = Math.floor(scaledViewport.width * outputScale); // CHANGED: the canvas has MORE real pixels than its on-screen size...
+            canvas.height = Math.floor(scaledViewport.height * outputScale); // CHANGED: ...in height too
+            canvas.style.width = `${scaledViewport.width}px`; // ...while CSS keeps the on-screen size the same as before
             canvas.style.height = `${scaledViewport.height}px`;
 
             await page.render({
                 canvasContext: ctx,
-                viewport: scaledViewport
+                viewport: scaledViewport,
+                transform: outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null // NEW: tells pdf.js to draw magnified by outputScale to fill the bigger canvas
             }).promise;
 
             const textContent = await page.getTextContent();
@@ -218,11 +246,10 @@ function PDFReader() {
         // Pre-fetch and cache the next page in the background so flipping
         // forward is instant. Runs silently after the current page is shown.
         const nextPage = pageNum + 1;
-        if (pdfRef.current && nextPage <= totalPages && !pageCache[nextPage]) {
+        if (pdfRef.current && nextPage <= totalPages && !pageCache[nextPage] && !isPhone()) { // CHANGED (mobile): skip the background pre-render on phones; nothing reads this cache yet, so it only burned battery
             try {
                 const page = await pdfRef.current.getPage(nextPage);
-                const containerWidth = canvasWrapRef.current?.parentElement?.clientWidth || 800;
-                const baseScale = Math.max((containerWidth - 40) / page.getViewport({ scale: 1 }).width, 0.5);
+                const baseScale = Math.max(getAvailableWidth() / page.getViewport({ scale: 1 }).width, 0.5); // CHANGED: same width helper as above
                 const zoomPct = zoom;
                 const scale = zoomPct === null ? baseScale : baseScale * (zoomPct / 100);
                 const vp = page.getViewport({ scale });
@@ -250,11 +277,20 @@ function PDFReader() {
     useEffect(() => {
         if (zoom !== null) return;
         const onResize = () => {
-            if (pdfLoaded && pdfjsLoaded) renderPage(currentPage);
+            if (!(pdfLoaded && pdfjsLoaded)) return; // nothing to redraw yet
+            const width = scrollRef.current?.clientWidth || 0; // the page area's width right now
+            if (Math.abs(width - lastWidthRef.current) < 2) return; // NEW (mobile): phones fire "resize" when the address bar hides while scrolling (height changes, width does not); redrawing then made the page flicker and dropped the text selection
+            renderPage(currentPage); // a real width change (rotation, window resize): redraw the page
         };
         window.addEventListener("resize", onResize);
         return () => window.removeEventListener("resize", onResize);
     }, [zoom, pdfLoaded, pdfjsLoaded, currentPage, renderPage]);
+
+    // NEW (mobile): when the page number changes, jump back to the top of the page area.
+    // A phone shows only part of a tall page, so without this, turning the page left you looking at the BOTTOM of the next page.
+    useEffect(() => {
+        if (scrollRef.current) scrollRef.current.scrollTop = 0; // 0 = the very top
+    }, [currentPage]); // runs only when the page number changes (not on zoom changes)
 
     // ─── Persist last-read page to backend (debounced) ───
     useEffect(() => {
@@ -406,6 +442,7 @@ function PDFReader() {
             const text = selection?.toString().trim();
             if (text && text.length > 3) {
                 setSelectedText(text);
+                setSheetOpen(true); // NEW (mobile): slide the meaning panel up as soon as something is selected
                 setResult(null);
                 setAdded(false);
                 setBookmarkSaved(false);
@@ -425,6 +462,26 @@ function PDFReader() {
             }
         }, 150);
     };
+
+    // NEW (mobile): phones select text with a long-press and drag handles, which never fires "mouseup" (the only trigger before).
+    // The browser's "selectionchange" event fires for mouse AND touch selection, so it replaces onMouseUp on the page area.
+    const selectionHandlerRef = useRef(handleTextSelection); // a box that always holds the newest handleTextSelection
+    selectionHandlerRef.current = handleTextSelection; // refresh it on every render
+    useEffect(() => {
+        let timer = null; // used to wait until the user stops moving the selection handles
+        const onSelectionChange = () => {
+            clearTimeout(timer); // restart the wait on every tiny change
+            timer = setTimeout(() => {
+                const selection = window.getSelection(); // what the user has highlighted right now
+                if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return; // nothing is highlighted
+                const layer = textLayerRef.current; // the invisible text layer sitting on the PDF page
+                if (!layer || !layer.contains(selection.anchorNode)) return; // ignore selections made anywhere else (inputs, the side panel)
+                selectionHandlerRef.current(); // same code the mouse used before
+            }, 350); // 350 ms of calm = the user has finished choosing
+        };
+        document.addEventListener("selectionchange", onSelectionChange); // start listening
+        return () => { clearTimeout(timer); document.removeEventListener("selectionchange", onSelectionChange); }; // stop listening on cleanup
+    }, []); // set up once
 
     const handleExplain = async () => {
         if (!selectedText || !word) return;
@@ -493,6 +550,7 @@ function PDFReader() {
     };
 
     const jumpToBookmark = (bm) => {
+        if (isPhone()) setSidebarOpen(false); // NEW (mobile): close the overlay side panel so the page is visible
         setSidebarTab("bookmarks");
         if (bm.page !== currentPage) {
             setCurrentPage(bm.page);
@@ -750,8 +808,13 @@ function PDFReader() {
     }, [pdfLoaded, totalPages]);
 
     const goToPage = (n) => {
+        if (isPhone()) setSidebarOpen(false); // NEW (mobile): picking a page in the overlay side panel closes it
         setCurrentPage(Math.max(1, Math.min(totalPages, n)));
     };
+
+    // NEW (mobile): pinch with two fingers to zoom, swipe sideways to change page (only while a PDF page is showing).
+    // PARENT -> CHILD: refs, zoom and the two setters go in; the hook calls setZoom / goToPage back (CHILD -> PARENT) when a gesture ends.
+    useReaderGestures({ scrollRef, wrapRef: canvasWrapRef, zoom, setZoom, goToPage, currentPage, enabled: pdfLoaded && !showLibrary });
 
     const formatSize = (bytes) => {
         if (!bytes) return "";
@@ -921,9 +984,9 @@ function PDFReader() {
                                     </div>
 
                                     <div className="tool-group">
-                                        <IconButton label="Zoom out" onClick={zoomOut} disabled={zoom !== null && zoom <= MIN_ZOOM}><TbMinus size={18} /></IconButton>
+                                        <IconButton label="Zoom out" className="hide-on-phone" onClick={zoomOut} disabled={zoom !== null && zoom <= MIN_ZOOM}><TbMinus size={18} /></IconButton>
                                         <span className="tool-label">{zoomLabel}</span>
-                                        <IconButton label="Zoom in" onClick={zoomIn} disabled={zoom !== null && zoom >= MAX_ZOOM}><TbPlus size={18} /></IconButton>
+                                        <IconButton label="Zoom in" className="hide-on-phone" onClick={zoomIn} disabled={zoom !== null && zoom >= MAX_ZOOM}><TbPlus size={18} /></IconButton>
                                         <IconButton label="Fit to width" onClick={fitToWidth} disabled={zoom === null}><TbArrowAutofitWidth size={18} /></IconButton>
                                     </div>
 
@@ -1020,7 +1083,7 @@ function PDFReader() {
                         {/* Canvas area */}
                         {!showLibrary && (
                             <div className="reader-canvas-container"
-                                onMouseUp={handleTextSelection}>
+                                ref={scrollRef}>{/* CHANGED (mobile): text selection is now detected by the "selectionchange" effect above, which also works for touch */}
 
                                 {!pdfLoaded && !loading && (
                                     <div className="reader-empty" onClick={() => fileRef.current.click()}>
@@ -1041,7 +1104,7 @@ function PDFReader() {
                                     </div>
                                 )}
 
-                                <div ref={canvasWrapRef} style={{
+                                <div ref={canvasWrapRef} className="reader-page-wrap" style={{
                                     position: "relative",
                                     display: pdfLoaded && !loading ? "inline-block" : "none",
                                     boxShadow: "0 4px 32px rgba(0,0,0,0.15)",
@@ -1060,8 +1123,11 @@ function PDFReader() {
                 </div>
 
                 {/* RIGHT: word panel. Select text in the PDF, ask about a word, then add it to your words. */}
-                <aside className="reader-right">
-                    <h3 className="panel-title">Contextual meaning</h3>
+                <aside className={`reader-right${sheetOpen ? " is-open" : ""}`}>{/* CHANGED (mobile): on phones this panel is a bottom sheet that slides up when is-open is set */}
+                    <div className="panel-head">
+                        <h3 className="panel-title">Contextual meaning</h3>
+                        <button type="button" className="sheet-close" aria-label="Close meaning panel" onClick={() => setSheetOpen(false)}>✕</button>{/* NEW (mobile): CHILD -> PARENT: tells the reader to hide the sheet; hidden on desktop by CSS */}
+                    </div>
 
                     {!selectedText && (
                         <div className="reader-tip">
