@@ -53,7 +53,7 @@ export default function Register() {
             </div>
             {error && <p className="form-error">{error}</p>}
             <Button variant="primary" block onClick={handleRegister} disabled={loading}>{loading ? "Creating…" : "Create account"}</Button>
-            <p className="auth-link">Already have an account? <button type="button" className="link-btn" onClick={() => navigate("/")}>Sign in</button></p>
+            <p className="auth-link">Already have an account? <button type="button" className="link-btn" onClick={() => navigate("/login")}>Sign in</button></p>
         </AuthCard>
     );
 }
