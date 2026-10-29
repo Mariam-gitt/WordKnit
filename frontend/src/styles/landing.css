@@ -1,0 +1,269 @@
+/* ═══════════════════════════════════════════════════════════════
+   LANDING — the welcome page at "/". Every colour, font and corner size comes from tokens.css,
+   so the page automatically matches the rest of WordKnit. All class names start with "lp-" (landing page)
+   so they can never clash with another page's styles.
+═══════════════════════════════════════════════════════════════ */
+
+.lp { /* the whole page */
+  min-height: 100%; /* at least as tall as the window, so the cream background fills it */
+  background: var(--paper); /* soft cream from tokens.css */
+  color: var(--ink-2); /* default body text colour */
+  padding: 0 24px 24px; /* space on the left, right and bottom (none on top: the nav has its own) */
+} /* end .lp */
+
+.lp > * { /* every direct child of .lp (nav, sections, footer) */
+  max-width: 1040px; /* never wider than this, so lines stay easy to read on big screens */
+  margin-left: auto; /* auto margins on both sides centre the block horizontally */
+  margin-right: auto; /* the other half of the centring trick */
+} /* end .lp > * */
+
+.lp-nav { /* the top bar */
+  display: flex; /* flexbox: lay children out in a row */
+  align-items: center; /* line them up vertically in the middle */
+  justify-content: space-between; /* brand on the far left, links on the far right */
+  padding: 18px 0; /* breathing room above and below */
+} /* end .lp-nav */
+
+.lp-brand { /* the "WordKnit." name */
+  font-family: var(--font-head); /* Playfair Display, the serif headline font */
+  font-size: 24px; /* a clear but quiet size */
+  font-weight: 700; /* bold */
+  color: var(--ink); /* near-black */
+} /* end .lp-brand */
+
+.lp-nav-links { /* the group of links on the right */
+  display: flex; /* row layout */
+  align-items: center; /* vertical centring */
+  gap: 20px; /* space between each link */
+  font-size: 14px; /* small and calm */
+} /* end .lp-nav-links */
+
+.lp-nav-links a { /* the text links in the top bar */
+  color: var(--muted); /* grey, so the Log in button stands out */
+  text-decoration: none; /* remove the default underline */
+} /* end .lp-nav-links a */
+
+.lp-nav-links a:hover { /* when the mouse is over a link */
+  color: var(--ink); /* darken it as feedback */
+} /* end .lp-nav-links a:hover */
+
+.lp-hero { /* the big top section */
+  display: grid; /* grid: place children in columns */
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* as many equal columns as fit, each at least 280px: two on desktop, one on phones */
+  gap: 40px; /* space between the text and the card */
+  align-items: center; /* centre both columns vertically */
+  padding: 48px 0 64px; /* generous space above and below */
+} /* end .lp-hero */
+
+.lp-title { /* the main headline */
+  font-size: 52px; /* big, it is the first thing people read */
+  line-height: 1.05; /* tight lines suit large serif text */
+  margin-bottom: 16px; /* gap before the paragraph */
+} /* end .lp-title */
+
+.lp-mark { /* the highlighted word "vocab." */
+  background: var(--yellow); /* the WordKnit yellow, like a highlighter pen */
+  padding: 0 8px; /* a little room left and right of the letters */
+  border-radius: 4px; /* softly rounded highlight */
+} /* end .lp-mark */
+
+.lp-sub { /* the paragraph under the headline */
+  font-size: 17px; /* slightly larger than normal text */
+  line-height: 1.6; /* airy lines are easier to read */
+  color: var(--muted); /* grey, secondary to the headline */
+  max-width: 380px; /* keep the line length comfortable */
+  margin-bottom: 24px; /* gap before the buttons */
+} /* end .lp-sub */
+
+.lp-actions { /* the row holding both hero buttons */
+  display: flex; /* row layout */
+  flex-wrap: wrap; /* let the buttons drop onto a second line on very small screens */
+  gap: 10px; /* space between the buttons */
+} /* end .lp-actions */
+
+.lp-actions a.btn { /* the "See features" link that wears button styling */
+  text-decoration: none; /* links are underlined by default; buttons should not be */
+} /* end .lp-actions a.btn */
+
+.lp-card-wrap { /* holds the word card and the tilted card behind it */
+  position: relative; /* lets the card behind be placed relative to this box */
+  max-width: 330px; /* keep the card a sensible size */
+  width: 100%; /* shrink on small screens */
+  justify-self: center; /* centre this box inside its grid column */
+  padding: 14px 0 18px 14px; /* extra room so the tilted card can peek out */
+} /* end .lp-card-wrap */
+
+.lp-card-back { /* the pale yellow card behind */
+  position: absolute; /* take it out of the normal flow so it can sit underneath */
+  top: 30px; /* start a little below the top */
+  left: 0; /* flush with the left edge */
+  right: 22px; /* stop short of the right edge so it looks offset */
+  bottom: 0; /* reach the bottom */
+  background: var(--yellow-soft); /* pale yellow from tokens.css */
+  border: 1px solid var(--line); /* thin soft border */
+  border-radius: var(--radius-lg); /* rounded like a card */
+  transform: rotate(-4deg); /* tilt it slightly for a hand-placed feel */
+} /* end .lp-card-back */
+
+.lp-card { /* the white word card in front */
+  position: relative; /* makes it stack above the absolute card behind */
+  background: var(--white); /* clean white */
+  border: 1px solid var(--line); /* thin soft border */
+  border-radius: var(--radius-lg); /* rounded corners */
+  padding: 20px; /* inner space */
+} /* end .lp-card */
+
+.lp-card-top { /* row: word + status chip */
+  display: flex; /* row layout */
+  justify-content: space-between; /* word on the left, chip on the right */
+  align-items: center; /* vertical centring */
+} /* end .lp-card-top */
+
+.lp-card-word { /* the sample word */
+  font-size: 28px; /* large, it is the star of the card */
+} /* end .lp-card-word */
+
+.lp-chip { /* the small "Review" label */
+  background: var(--yellow-soft); /* pale yellow pill */
+  color: var(--ink); /* dark text for contrast */
+  font-size: 11px; /* tiny label size */
+  padding: 3px 10px; /* space inside the pill */
+  border-radius: var(--radius-sm); /* softly rounded */
+} /* end .lp-chip */
+
+.lp-card-pos { /* "noun" */
+  font-size: 12px; /* small */
+  color: var(--muted); /* grey */
+  margin: 2px 0 10px; /* tight above, a gap below */
+} /* end .lp-card-pos */
+
+.lp-card-meaning { /* the meaning sentence */
+  font-size: 14px; /* normal reading size */
+  color: var(--ink); /* dark for readability */
+  margin-bottom: 12px; /* gap below */
+} /* end .lp-card-meaning */
+
+.lp-card-context { /* the sentence the word came from */
+  font-family: var(--font-read); /* Libre Baskerville: the app's reading font */
+  font-size: 13px; /* slightly small */
+  line-height: 1.55; /* comfortable spacing */
+  color: var(--muted); /* grey, it is supporting text */
+  border-left: 2px solid var(--yellow); /* a yellow quote bar on the left */
+  padding-left: 10px; /* space between the bar and the text */
+  margin-bottom: 14px; /* gap below */
+} /* end .lp-card-context */
+
+.lp-card-context mark { /* the highlighted word inside the sentence */
+  background: var(--yellow-soft); /* pale yellow highlight */
+  color: var(--ink); /* dark text */
+} /* end .lp-card-context mark */
+
+.lp-card-foot { /* bottom row of the card */
+  display: flex; /* row layout */
+  justify-content: space-between; /* source left, share right */
+  align-items: center; /* vertical centring */
+  font-size: 12px; /* small print */
+  color: var(--muted); /* grey */
+} /* end .lp-card-foot */
+
+.lp-share { /* the look-only "Share" label */
+  display: inline-flex; /* icon and text side by side */
+  align-items: center; /* vertically centred */
+  gap: 4px; /* space between icon and text */
+  border: 1px solid var(--line-strong); /* firmer outline so it reads as a button */
+  border-radius: var(--radius-sm); /* rounded */
+  padding: 4px 10px; /* space inside */
+  color: var(--ink); /* dark text */
+} /* end .lp-share */
+
+.lp-section { /* a content block (features, how it works) */
+  border-top: 1px solid var(--line); /* thin divider line above each block */
+  padding: 40px 0; /* space above and below */
+} /* end .lp-section */
+
+.lp-h2 { /* section headings */
+  font-size: 26px; /* clear but smaller than the main headline */
+  margin-bottom: 6px; /* small gap before the line below */
+} /* end .lp-h2 */
+
+.lp-lead { /* the grey line under a heading */
+  color: var(--muted); /* grey */
+  margin-bottom: 24px; /* gap before the content */
+} /* end .lp-lead */
+
+.lp-grid { /* the feature layout */
+  display: grid; /* grid layout */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* columns at least 200px wide, filling the row, wrapping on small screens */
+  gap: 28px 24px; /* 28px between rows, 24px between columns */
+} /* end .lp-grid */
+
+.lp-icon { /* the yellow tile behind each icon */
+  width: 38px; /* fixed width */
+  height: 38px; /* fixed height, so it is a square */
+  display: flex; /* so we can centre the icon inside */
+  align-items: center; /* vertical centring */
+  justify-content: center; /* horizontal centring */
+  background: var(--yellow-soft); /* pale yellow tile */
+  border-radius: var(--radius-sm); /* rounded corners */
+  font-size: 20px; /* icons scale with font-size */
+  color: var(--ink); /* dark icon */
+  margin-bottom: 10px; /* gap before the title */
+} /* end .lp-icon */
+
+.lp-feature-title { /* the feature name */
+  font-size: 17px; /* a bit larger than body text */
+  margin-bottom: 4px; /* small gap before the description */
+} /* end .lp-feature-title */
+
+.lp-feature-text { /* the feature description */
+  font-size: 14px; /* normal small text */
+  line-height: 1.55; /* comfortable spacing */
+  color: var(--muted); /* grey */
+} /* end .lp-feature-text */
+
+.lp-steps { /* row of steps */
+  display: grid; /* grid layout */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* same wrapping trick as the features */
+  gap: 18px; /* space between steps */
+} /* end .lp-steps */
+
+.lp-step { /* one step */
+  display: flex; /* circle and text side by side */
+  align-items: center; /* vertically centred */
+  gap: 12px; /* space between circle and text */
+} /* end .lp-step */
+
+.lp-step-num { /* the numbered circle */
+  min-width: 34px; /* never shrink below this width */
+  height: 34px; /* same as the width, so it is a circle */
+  border-radius: 50%; /* 50% radius turns a square into a circle */
+  background: var(--yellow); /* brand yellow */
+  color: var(--ink); /* dark number */
+  font-weight: 600; /* semi-bold */
+  display: flex; /* centre the number inside */
+  align-items: center; /* vertical centring */
+  justify-content: center; /* horizontal centring */
+} /* end .lp-step-num */
+
+.lp-cta { /* the closing block */
+  border-top: 1px solid var(--line); /* divider line above */
+  padding: 48px 0 32px; /* space above and below */
+  text-align: center; /* centre all text */
+} /* end .lp-cta */
+
+.lp-footer { /* the bottom strip */
+  display: flex; /* row layout */
+  justify-content: space-between; /* name left, tagline right */
+  font-size: 12px; /* small print */
+  color: var(--muted); /* grey */
+  padding-top: 16px; /* space above */
+} /* end .lp-footer */
+
+@media (max-width: 600px) { /* rules that apply only on phone-sized screens */
+  .lp-title { /* the main headline on phones */
+    font-size: 40px; /* smaller, so it does not overflow */
+  } /* end .lp-title (phones) */
+  .lp-nav-links a { /* the text links on phones */
+    display: none; /* hide them to leave room for the Log in button */
+  } /* end .lp-nav-links a (phones) */
+} /* end the phone media query */

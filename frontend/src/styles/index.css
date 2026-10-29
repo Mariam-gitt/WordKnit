@@ -10,3 +10,4 @@
 @import "./reader.css";
 @import "./speaking.css";
 @import "./profile.css";
+@import "./landing.css"; /* NEW: the welcome page at "/" */
