@@ -6,10 +6,10 @@
 import React, { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
-// Login is imported NORMALLY (not lazily) on purpose: it's the very first thing almost
-// everyone sees, so there's no benefit to code-splitting it — doing so would just add an
+// Landing (the welcome page) is imported NORMALLY (not lazily) on purpose: it's the very first thing
+// almost everyone sees, so there's no benefit to code-splitting it — doing so would just add an
 // extra "Loading…" flash on the page people land on first, for no real speed gain.
-import Login from "./pages/Login";
+import Landing from "./pages/Landing"; // NEW: the welcome page, now shown at "/"
 import { AuthProvider, useAuth } from "./AuthContext"; // NEW: shares "am I logged in?" with the whole app (replaces peeking at localStorage)
 
 // Every OTHER page is now lazy-loaded: its JavaScript is only downloaded the moment
@@ -17,6 +17,7 @@ import { AuthProvider, useAuth } from "./AuthContext"; // NEW: shares "am I logg
 // code being bundled into one giant file that loads before you've even logged in.
 // This is the single biggest initial-load speed win available without changing any
 // actual page component or build tool.
+const Login = lazy(() => import("./pages/Login")); // NEW: Login moved here (it is no longer the first page, so it can load on demand)
 const Register = lazy(() => import("./pages/Register"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Flashcards = lazy(() => import("./pages/Flashcards"));
@@ -29,7 +30,7 @@ const SpeakingPractice = lazy(() => import("./pages/SpeakingPractice"));
 function ProtectedRoute({ children }) {
     const { status } = useAuth(); // NEW: the login state comes from AuthContext (the server told it), not from localStorage
     if (status === "checking") return <PageLoading />; // NEW: still asking the server "is there a valid login cookie?" — show Loading… instead of flashing the login page
-    if (status === "out") return <Navigate to="/" replace />; // NEW: not logged in → go to the sign-in page
+    if (status === "out") return <Navigate to="/login" replace />; // NEW: not logged in → go to the sign-in page (now at /login, because "/" is the welcome page)
     return children; // logged in → show the protected page
 }
 
@@ -54,7 +55,8 @@ export default function App() {
                 without needing to repeat that logic on every single route. */}
             <Suspense fallback={<PageLoading />}>
                 <Routes>
-                    <Route path="/" element={<Login />} />
+                    <Route path="/" element={<Landing />} />{/* NEW: the welcome page */}
+                    <Route path="/login" element={<Login />} />{/* NEW: sign-in moved here from "/" */}
                     <Route path="/register" element={<Register />} />
                     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                     <Route path="/flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />
